@@ -1,6 +1,6 @@
 # Pico EPD Audio Player
 
-**DAC Implementation is by the amazing [Elehobica](https://github.com/elehobica) [repo](https://github.com/elehobica/pico_audio_i2s_32b)**
+**DAC Implementation is by the amazing [Elehobica](https://github.com/elehobica) [repo](https://github.com/elehobica/pico_audio_i2s_32b)**  
 **WAV/MP3 Decoding is _currently_ done with [dr_libs](https://github.com/mackron/dr_libs) implementations**
 
 This Project utilises a few custom file-formats to store and manage Audio-/Meta- and Font Data
