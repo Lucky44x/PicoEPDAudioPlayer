@@ -3,10 +3,6 @@
 
 #include "epd2in9.h"
 
-#include "pico/stdlib.h"
-#include "hardware/spi.h"
-#include "stdio.h"
-
 //Partial Waveform -- MAGIC, Don't touch
 static uint8_t _WF_PARTIAL_2IN9[159] = {
     0x0,0x40,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,0x0,

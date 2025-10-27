@@ -5,6 +5,9 @@
 #include "hardware/spi.h"
 #include "stdio.h"
 
+#define EPD_WIDTH   128
+#define EPD_HEIGHT  296
+
 typedef struct {
     int pin_rst;
     int pin_dc;
@@ -15,7 +18,7 @@ typedef struct {
     spi_inst_t *epd_port_spi;
 } epd_config_t;
 
-epd_config_t epd_spi0_default_config = {
+static epd_config_t epd_spi0_default_config = {
     20, 16, 17, 21, 18, 19, (spi_inst_t*)spi0
 };
 

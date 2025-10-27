@@ -43,6 +43,9 @@
         "epd2in9-impl.h": "c",
         "stdio.h": "c",
         "spi.h": "c",
-        "stdlib.h": "c"
+        "stdlib.h": "c",
+        "epddraw-impl.h": "c",
+        "epddraw.h": "c",
+        "functional": "c"
     }
 }
