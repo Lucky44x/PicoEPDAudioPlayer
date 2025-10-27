@@ -39,7 +39,9 @@ pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(EinkWavPlayer EinkWavPlayer.cpp )
+add_executable(EinkWavPlayer 
+    src/EinkWavPlayer.cpp
+)
 
 pico_set_program_name(EinkWavPlayer "EinkWavPlayer")
 pico_set_program_version(EinkWavPlayer "0.1")

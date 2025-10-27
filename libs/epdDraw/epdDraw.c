@@ -127,7 +127,23 @@ function :	Draws a point at the given position
 parameter:  cfg, xPoint, yPoint, color, dotSize, dotStyle
 ******************************************************************************/
 void canvas_draw_point(canvas_config_t *cfg, uint16_t xPoint, uint16_t yPoint, uint8_t color, CANVAS_DOT_SIZE pixelStyle, CANVAS_DOT_STYLE fillStyle) {
+    if ( xPoint > cfg->width || yPoint > cfg->height ) return;
 
+    int16_t xDirNum, yDirNum;
+    if ( fillStyle == DOT_FILL_AROUND ) {
+        for ( xDirNum = 0; yDirNum < 2 * pixelStyle - 1; xDirNum++ ) {
+            for ( yDirNum = 0; yDirNum < 2 * pixelStyle - 1; yDirNum++ ) {
+                if ( xPoint + xDirNum - pixelStyle < 0 || yPoint + yDirNum - pixelStyle < 0 ) break;
+                canvas_set_pixel(cfg, xPoint + xDirNum - pixelStyle, yPoint + yDirNum - pixelStyle, color);
+            }
+        }
+    } else {
+        for ( xDirNum = 0; yDirNum < pixelStyle; xDirNum++ ) {
+            for ( yDirNum = 0; yDirNum < pixelStyle; yDirNum++ ) {
+                canvas_set_pixel(cfg, xPoint + xDirNum - 1, yPoint + yDirNum - 1, color);
+            }
+        }
+    }
 }
 
 /******************************************************************************
@@ -135,7 +151,44 @@ function :	Draws a Line on the canvas
 parameter:  cfg, xStart, yStart, xEnd, yEnd, color, dotSize (lineWidth), lineStyle
 ******************************************************************************/
 void canvas_draw_line(canvas_config_t *cfg, uint16_t xStart, uint16_t yStart, uint16_t xEnd, uint16_t yEnd, uint8_t color, CANVAS_DOT_SIZE lineWidth, CANVAS_LINE_STYLE lineStyle) {
+    if ( xStart > cfg->width|| yStart > cfg->height || xEnd > cfg->width || yEnd > cfg->height ) return;
 
+    uint16_t xPoint = xStart;
+    uint16_t yPoint = yStart;
+    int dx = (int)xEnd - (int)xStart >= 0 ? xEnd - xStart : xStart - xEnd;
+    int dy = (int)yEnd - (int)yStart <= 0 ? yEnd - yStart : yStart - yEnd;
+
+    // Increment direction, 1 is positive, -1 is counter;
+    int xAddway = xStart < xEnd ? 1 : -1;
+    int yAddway = yStart < yEnd ? 1 : -1;
+
+    //Cumulative error
+    int esp = dx + dy;
+    char dottedLen = 0;
+
+    for (;;) {
+        dottedLen++;
+        //Painted dotted line, 2 point is really virtual
+        if (lineStyle == LINE_STYLE_DOTTED && dottedLen % 3 == 0) {
+            //Debug("LINE_DOTTED\r\n");
+            canvas_draw_point(cfg, xPoint, yPoint, cfg->color, lineWidth, CANVAS_DOT_STYLE_DFT);
+            dottedLen = 0;
+        } else {
+            canvas_draw_point(cfg, xPoint, yPoint, color, lineWidth, CANVAS_DOT_STYLE_DFT);
+        }
+        if (2 * esp >= dy) {
+            if (xPoint == xEnd)
+                break;
+            esp += dy;
+            xPoint += xAddway;
+        }
+        if (2 * esp <= dx) {
+            if (yPoint == yEnd)
+                break;
+            esp += dx;
+            yPoint += yAddway;
+        }
+    }
 }
 
 /******************************************************************************
@@ -143,7 +196,19 @@ function :  Draws a rect on the canvas
 parameter:  cfg, xStart, yStart, xEnd, yEnd, color, dotSize (lineWidth), fillStyle
 ******************************************************************************/
 void canvas_draw_rect(canvas_config_t *cfg, uint16_t xStart, uint16_t yStart, uint16_t xEnd, uint16_t yEnd, uint8_t color, CANVAS_DOT_SIZE lineWidth, CANVAS_DRAW_FILL fillStyle) {
+    if ( xStart > cfg->width || yStart > cfg->height || xEnd > cfg->width || yEnd > cfg->height ) return;
 
+    if (fillStyle) {
+        uint16_t yPoint;
+        for(yPoint = yStart; yPoint < yEnd; yPoint++) {
+            canvas_draw_line(cfg, xStart, yPoint, xEnd, yPoint, color , lineWidth, LINE_STYLE_SOLID);
+        }
+    } else {
+        canvas_draw_line(cfg, xStart, yStart, xEnd, yStart, color, lineWidth, LINE_STYLE_SOLID);
+        canvas_draw_line(cfg, xStart, yStart, xStart, yEnd, color, lineWidth, LINE_STYLE_SOLID);
+        canvas_draw_line(cfg, xEnd, yEnd, xEnd, yStart, color, lineWidth, LINE_STYLE_SOLID);
+        canvas_draw_line(cfg, xEnd, yEnd, xStart, yEnd, color, lineWidth, LINE_STYLE_SOLID);
+    }
 }
 
 /******************************************************************************
@@ -151,7 +216,57 @@ function :  Draws a circle on the canvas
 parameter:  cfg, xCenter, yCenter, radius, color, dotSize (lineWidth), fillStyle
 ******************************************************************************/
 void canvas_draw_circle(canvas_config_t *cfg, uint16_t xCenter, uint16_t yCenter, uint16_t radius, uint8_t color, CANVAS_DOT_SIZE lineWidth, CANVAS_DRAW_FILL fillStyle) {
+    if ( xCenter > cfg->width || yCenter >= cfg->height ) return;
+    
+    //Draw a circle from(0, R) as a starting point
+    int16_t xCurrent, yCurrent;
+    xCurrent = 0;
+    yCurrent = radius;
 
+    //Cumulative error,judge the next point of the logo
+    int16_t esp = 3 - (radius << 1 );
+
+    int16_t sCountY;
+    if (fillStyle == DRAW_FILL_FULL) {
+        while (xCurrent <= yCurrent ) { //Realistic circles
+            for (sCountY = xCurrent; sCountY <= yCurrent; sCountY ++ ) {
+                canvas_draw_point(cfg, xCenter + xCurrent, yCenter + sCountY, color, CANVAS_DOT_SIZE_DFT, CANVAS_DOT_STYLE_DFT);//1
+                canvas_draw_point(cfg, xCenter - xCurrent, yCenter + sCountY, color, CANVAS_DOT_SIZE_DFT, CANVAS_DOT_STYLE_DFT);//2
+                canvas_draw_point(cfg, xCenter - sCountY, yCenter + xCurrent, color, CANVAS_DOT_SIZE_DFT, CANVAS_DOT_STYLE_DFT);//3
+                canvas_draw_point(cfg, xCenter - sCountY, yCenter - xCurrent, color, CANVAS_DOT_SIZE_DFT, CANVAS_DOT_STYLE_DFT);//4
+                canvas_draw_point(cfg, xCenter - xCurrent, yCenter - sCountY, color, CANVAS_DOT_SIZE_DFT, CANVAS_DOT_STYLE_DFT);//5
+                canvas_draw_point(cfg, xCenter + xCurrent, yCenter - sCountY, color, CANVAS_DOT_SIZE_DFT, CANVAS_DOT_STYLE_DFT);//6
+                canvas_draw_point(cfg, xCenter + sCountY, yCenter - xCurrent, color, CANVAS_DOT_SIZE_DFT, CANVAS_DOT_STYLE_DFT);//7
+                canvas_draw_point(cfg, xCenter + sCountY, yCenter + xCurrent, color, CANVAS_DOT_SIZE_DFT, CANVAS_DOT_STYLE_DFT);
+            }
+            if (esp < 0 )
+                esp += 4 * xCurrent + 6;
+            else {
+                esp += 10 + 4 * (xCurrent - yCurrent );
+                yCurrent --;
+            }
+            xCurrent ++;
+        }
+    } else { //Draw a hollow circle
+        while (xCurrent <= yCurrent ) {
+            canvas_draw_point(cfg, xCenter + xCurrent, yCenter + yCurrent, color, lineWidth, CANVAS_DOT_STYLE_DFT);//1
+            canvas_draw_point(cfg, xCenter - xCurrent, yCenter + yCurrent, color, lineWidth, CANVAS_DOT_STYLE_DFT);//2
+            canvas_draw_point(cfg, xCenter - xCurrent, yCenter + yCurrent, color, lineWidth, CANVAS_DOT_STYLE_DFT);//3
+            canvas_draw_point(cfg, xCenter - xCurrent, yCenter - yCurrent, color, lineWidth, CANVAS_DOT_STYLE_DFT);//4
+            canvas_draw_point(cfg, xCenter - xCurrent, yCenter - yCurrent, color, lineWidth, CANVAS_DOT_STYLE_DFT);//5
+            canvas_draw_point(cfg, xCenter + xCurrent, yCenter - yCurrent, color, lineWidth, CANVAS_DOT_STYLE_DFT);//6
+            canvas_draw_point(cfg, xCenter + xCurrent, yCenter - yCurrent, color, lineWidth, CANVAS_DOT_STYLE_DFT);//7
+            canvas_draw_point(cfg, xCenter + xCurrent, yCenter + yCurrent, color, lineWidth, CANVAS_DOT_STYLE_DFT);//0
+
+            if (esp < 0 )
+                esp += 4 * xCurrent + 6;
+            else {
+                esp += 10 + 4 * (xCurrent - yCurrent );
+                yCurrent --;
+            }
+            xCurrent ++;
+        }
+    }
 }
 
 /******************************************************************************
