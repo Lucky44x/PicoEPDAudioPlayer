@@ -2,7 +2,7 @@
 #define FILEMANAGER_H
 
 #include <stdint.h>
-#include "dr_mp3.h"
+#include "dr_wav.h"
 
 extern "C" {
     #include "ff.h"
@@ -92,6 +92,38 @@ class FILEMANAGER {
         uint32_t wav_data_bytes_ = 0;
 };
 
+//DR_WAV specific implementations
+static size_t wav_read(void* ud, void* out, size_t bytes_to_read) {
+    FIL* fil = (FIL*)ud;
+    UINT br = 0;
+    FRESULT fr = f_read(fil, out, (UINT)bytes_to_read, &br);
+    if (fr != FR_OK && br == 0) return 0;
+    return (size_t)br;
+}
+
+static drwav_bool32 wav_seek(void *ud, int offset, drwav_seek_origin origin) {
+    FIL* f = (FIL*)ud;
+    FSIZE_t cur  = f_tell(f);
+    FSIZE_t size = f_size(f);
+
+    int64_t base =
+        (origin == DRWAV_SEEK_SET)  ? 0 :
+        (origin == DRWAV_SEEK_CUR)  ? (int64_t)cur :
+                                    (int64_t)size; // if your dr_wav defines SEEK_END
+
+    int64_t target = base + (int64_t)offset;
+    if (target < 0 || target > (int64_t)size) return DRWAV_FALSE;
+
+    return (f_lseek(f, (FSIZE_t)target) == FR_OK) ? DRWAV_TRUE : DRWAV_FALSE;
+}
+
+static drwav_bool32 wav_tell(void* pUserData, drwav_int64* pCursor) {
+    FIL* f = (FIL*)pUserData;
+    *pCursor = (drwav_int64)f_tell(f);
+    return DRWAV_TRUE;
+}
+
+/*
 //drmp3_specific implementations
 static size_t mp3_read(void* pUserData, void* pBufferOut, size_t bytesToRead) {
     FIL* file = (FIL*)pUserData;
@@ -126,4 +158,5 @@ static drmp3_bool32 mp3_tell(void* pUserData, drmp3_int64* pCursor) {
     *pCursor = (drmp3_int64)f_tell(file);
     return DRMP3_TRUE;
 }
+*/
 #endif

@@ -15,3 +15,7 @@ Audio, Image and Meta-Data is saved in .db files, which are binary databases whi
 _TO BE COMPLETED_
 
 These Database Files need another Tool to properly encode them onto a Micro-SD Card, which will be uploaded later
+
+
+## Important: Reckoning
+Since I discovered that my original approach would not work the way I intented, I will have to redesign the entire project to instead split the two cores of the pico to one UI and File core as well as one audio-core

@@ -63,11 +63,11 @@ static inline void md5ToFilename(const uint8_t md5[16], char out[33+4]) {
         out[i * 2]     = hexDigits[(md5[i] >> 4) & 0xF];
         out[i * 2 + 1] = hexDigits[md5[i] & 0xF];
     }
-    // Append ".mp3"
+    // Append ".wav"
     out[32] = '.';
-    out[33] = 'm';
-    out[34] = 'p';
-    out[35] = '3';
+    out[33] = 'w';
+    out[34] = 'a';
+    out[35] = 'v';
     out[36] = '\0'; // Null-terminate
 }
 

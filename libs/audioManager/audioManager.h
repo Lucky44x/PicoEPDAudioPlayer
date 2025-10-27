@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include "fileManager.h"
-#include "dr_mp3.h"
+#include "dr_wav.h"
 
 extern "C" {
     #include "pico/audio_i2s.h"
@@ -35,7 +35,8 @@ class AUDIOMANAGER {
         void playback_loop();
 
 
-        drmp3 mp3Instance;
+        //drmp3 mp3Instance;
+        drwav wavInstance;
         FILEMANAGER& fileManager;
         audio_buffer_pool_t *producer_pool = nullptr;
         audio_buffer_format_t producer_buffer_format;

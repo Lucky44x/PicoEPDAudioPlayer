@@ -1,5 +1,4 @@
-#define PICO_AUDIO_I2S_DMA_IRQ 1
-#define PICO_AUDIO_I2S_PIO 0
+#define PICO_AUDIO_I2S_DMA_IRQ 1  // use DMA_IRQ_1 for audio
 
 #include "audioManager.h"
 #include <string.h>
@@ -11,11 +10,13 @@
 #include <algorithm>
 #include <math.h>
 
-static constexpr drmp3_uint64 FRAMES_PER_CHUNK = 1152 * 4; // ~4 mp3 frames
-static int16_t pcm[FRAMES_PER_CHUNK * 2]; // *2 covers stereo worst case
+//static constexpr drwav_uint64 FRAMES_PER_CHUNK = 1152 * 4; 
 
 static constexpr int PRODUCER_BUF_COUNT = 4;
-static constexpr int PRODUCER_SAMPLES_PER_BUF = 1024;
+static constexpr int PRODUCER_SAMPLES_PER_BUF = 1152*4; // ~4 mp3 frames
+
+static int16_t pcm[PRODUCER_SAMPLES_PER_BUF * 2]; // *2 covers stereo worst case
+static size_t CHUNK_FRAMES = PRODUCER_SAMPLES_PER_BUF;
 
 uint64_t cap_frames_left = 1152*260;
 
@@ -56,6 +57,9 @@ void AUDIOMANAGER::init_audio_output(uint32_t sample_rate) {
         printf("i2s setup failed \n");
         return;
     }
+
+    // after audio_i2s_setup(), once:
+    irq_set_priority(DMA_IRQ_1, 0xC0);   // lower priority (bigger value = lower prio)
 
     // 5) create producer pool
     producer_pool = audio_new_producer_pool(&producer_buffer_format, PRODUCER_BUF_COUNT, PRODUCER_SAMPLES_PER_BUF);
@@ -130,25 +134,34 @@ size_t AUDIOMANAGER::push_pcm_to_producer(const int16_t* pcm_src, size_t frames)
 void AUDIOMANAGER::initialize_playback(uint32_t index) {
     FRESULT fr = this->fileManager.read_song_file(index);
     if (fr != FR_OK) { 
-        printf("Could not read song file... %d", fr);
+        printf("Could not read song file... %d\n", fr);
         return;
     }
 
     printf("First file pos: %d\n",(unsigned)f_tell(&fileManager.currentSongFile));
 
-    bool ok = drmp3_init(&mp3Instance, mp3_read, mp3_seek, mp3_tell, NULL, &fileManager.currentSongFile, NULL);
+    uint8_t hdr[64]; UINT br=0;
+    f_lseek(&fileManager.currentSongFile, 0);
+    FRESULT fr1 = f_read(&fileManager.currentSongFile, hdr, sizeof hdr, &br);
+    printf("hdr read fr=%d br=%u sig=%.4s fmt=%.4s\n",
+        fr1, (unsigned)br, hdr, hdr+8);
+
+    f_lseek(&fileManager.currentSongFile, 0);
+    bool ok = drwav_init(&wavInstance, wav_read, wav_seek, wav_tell, &fileManager.currentSongFile, NULL);
+    //bool ok = drmp3_init(&mp3Instance, mp3_read, mp3_seek, mp3_tell, NULL, &fileManager.currentSongFile, NULL);
     if (!ok) { 
-        printf("Could not initialize song file playback mp3 instance");
+        printf("Could not initialize song file playback wav instance, failed at pos=%u\n", (unsigned)f_tell(&fileManager.currentSongFile));
         return;
     }
 
-    init_audio_output(mp3Instance.sampleRate);
+    init_audio_output(wavInstance.sampleRate);
 
     //fileManager.wav_begin("capture.wav",mp3Instance.sampleRate,2,16);
 }
 
 // Decode only the first `max_frames_total` frames, then stop.
 bool AUDIOMANAGER::play_first_frames(uint32_t index, size_t max_frames_total) {
+    /*
     FRESULT fr = fileManager.read_song_file(index);
     if (fr != FR_OK) { printf("open fail %d\n", fr); return false; }
 
@@ -207,24 +220,28 @@ bool AUDIOMANAGER::play_first_frames(uint32_t index, size_t max_frames_total) {
     drmp3_uninit(&mp3Instance);
     fileManager.close_song_file();
     return true;
+    */
 }
 
 void AUDIOMANAGER::play_song(uint32_t index) {
     this->initialize_playback(index);
-    printf("MP3 pos before decode: %u of %u\n",
+    /*
+    printf("WAV pos before decode: %u of %u\n",
        (unsigned)f_tell(&fileManager.currentSongFile),
        (unsigned)f_size(&fileManager.currentSongFile));
+    */
     playback_loop();
     end_playback();
 }
 
 void AUDIOMANAGER::decode_chunk() {
-    drmp3_uint64 frames = drmp3_read_pcm_frames_s16(&mp3Instance, FRAMES_PER_CHUNK, pcm);
+    //TODO: Add wav frame reading back in
+    drwav_uint64 frames = 0;//drmp3_read_pcm_frames_s16(&mp3Instance, FRAMES_PER_CHUNK, pcm);
     if (frames == 0) return; // End of stream
 
-    if (mp3Instance.channels == 1) {
+    if (wavInstance.channels == 1) {
         // Mono -> duplicate to stereo in-place (from end to front)
-        for (drmp3_uint64 i = frames; i-- > 0; ) {
+        for (drwav_uint64 i = frames; i-- > 0; ) {
             int16_t s = pcm[i];
             pcm[2*i + 0] = s;
             pcm[2*i + 1] = s;
@@ -233,73 +250,41 @@ void AUDIOMANAGER::decode_chunk() {
 }
 
 void AUDIOMANAGER::end_playback() {
-    drmp3_uninit(&mp3Instance);
+    drwav_uninit(&wavInstance);
+    //drmp3_uninit(&mp3Instance);
     fileManager.close_song_file();
 
     audio_i2s_set_enabled(false);
 }
 
 void AUDIOMANAGER::playback_loop() {
-  for (;;) {
-        printf("Playback Frame\n");
+    for (;;) {
+        //printf("Playback frame\n");
+        
+        drwav_uint64 got = drwav_read_pcm_frames_s16(&wavInstance, CHUNK_FRAMES, pcm);
 
-        // Decode up to FRAMES_PER_CHUNK frames into 'pcm' (interleaved)
-        drmp3_uint64 frames = drmp3_read_pcm_frames_s16(&mp3Instance, FRAMES_PER_CHUNK, pcm);
-        printf("Got: %llu frames \n", (unsigned long long)frames);
+        //printf("Read frame\n");
+        if (got == 0) break; //end of file
 
-        if (frames > 0) {
-            printf("read frames\n");
-            printf("pcm frames: %llu\n", (unsigned long long)frames);
-            printf("L0=%d R0=%d\n", pcm[0], (mp3Instance.channels==1? pcm[0] : pcm[1]));
-        }
-
-        if (frames == 0) {
-            // EOS
-            break;
-        }
-
-        // If mono input, duplicate to stereo (driver expects interleaved L,R)
-        if (mp3Instance.channels == 1) {
-            printf("Duplicating frames\n");
-            for (drmp3_uint64 i = frames; i-- > 0; ) {
+        //Mirror to channel 2 for stereo
+        if (wavInstance.channels == 1) {
+            for (drwav_uint64 i = got; i-- > 0;) {
                 int16_t s = pcm[i];
-                pcm[2*i + 0] = s;
-                pcm[2*i + 1] = s;
-            }
-            printf("Finished stereo\n");
-        }
-
-        /*
-        //Write to WAV
-        if (cap_frames_left > 0) {
-            size_t to_cap = (frames > cap_frames_left) ? (size_t)cap_frames_left : (size_t)frames;
-            fileManager.wav_write_pcm_s16(pcm, to_cap);
-            cap_frames_left -= to_cap;
-            if (cap_frames_left == 0) {
-                fileManager.wav_end();
-                printf("WAV FILE FINISHED\n");
+                pcm[2*i+0] = s;
+                pcm[2*i+1] = s;
             }
         }
-        */
 
-        printf("Starting push");
-        /*
-        size_t remaining = (size_t)frames;
+        //printf("Starting pcm send...\n");
         size_t sent = 0;
-        while (sent < remaining) {
-            size_t n = push_pcm_to_producer(pcm + sent*2, remaining - sent);
-            if (n == 0) {
-                // pipeline full — let IRQ/DMA drain
-                sleep_us(300);
-                continue;
-            }
+        while (sent < (size_t)got) {
+            size_t n = push_pcm_to_producer(pcm + sent*2, (size_t)got - sent);
+            if (n == 0) { sleep_us(300); continue; }
             sent += n;
-            printf("Sent...");
         }
-        */
     }
 
-    printf("Song END");
+    printf("Song END\n");
     // Optionally wait a tiny moment to let the ring drain before stopping
     sleep_ms(10);
 }

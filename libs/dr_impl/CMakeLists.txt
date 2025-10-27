@@ -1,6 +1,7 @@
 project(dr_impl)
 
-add_library(dr_impl STATIC dr_mp3_impl.c)
+#add_library(dr_impl STATIC dr_mp3_impl.c)
+add_library(dr_impl STATIC dr_wav_impl.c)
 
 target_link_libraries(dr_impl pico_stdlib pico_fatfs)
 
