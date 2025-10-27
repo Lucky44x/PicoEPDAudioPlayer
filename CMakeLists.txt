@@ -50,7 +50,7 @@ pico_enable_stdio_usb(EInkMp3 1)
 add_subdirectory(libs/epdDraw)
 add_subdirectory(libs/pico_fatfs)
 add_subdirectory(libs/fileManager)
-add_subdirectory(libs/audioManager)
+add_subdirectory(libs/audioPlayer)
 add_subdirectory(libs/dr_impl)
 
 # Add the standard library to the build
@@ -67,7 +67,7 @@ target_link_libraries(EInkMp3
     epdDraw
     pico_fatfs
     fileManager
-    audioManager
+    audioPlayer
 )
 
 pico_add_extra_outputs(EInkMp3)

@@ -73,9 +73,9 @@ static inline void md5ToFilename(const uint8_t md5[16], char out[33+4]) {
 
 // ---------- FILE MANAGER ---------- \\
 
-FILEMANAGER::FILEMANAGER() {}
+FileManager::FileManager() {}
 
-FRESULT FILEMANAGER::init_file_system() {
+FRESULT FileManager::init_file_system() {
     //Setup SD-Config
     pico_fatfs_spi_config_t sdConfig = {
         .spi_inst = spi1,
@@ -142,7 +142,7 @@ FRESULT FILEMANAGER::init_file_system() {
     return FR_OK;
 }
 
-FRESULT FILEMANAGER::deinit_file_system() {
+FRESULT FileManager::deinit_file_system() {
     f_close(&songsDB);
     f_close(&artistsDB);
     f_close(&albumsDB);
@@ -150,7 +150,7 @@ FRESULT FILEMANAGER::deinit_file_system() {
     return FR_OK;
 }
 
-FRESULT FILEMANAGER::read_song_by_index(uint32_t index, SongRecord* out) {
+FRESULT FileManager::read_song_by_index(uint32_t index, SongRecord* out) {
     //Seek to index * 66
     FSIZE_t off = (FSIZE_t)index * SONG_RECORD_SIZE;
     FRESULT fr = f_lseek(&songsDB, off);
@@ -167,11 +167,11 @@ FRESULT FILEMANAGER::read_song_by_index(uint32_t index, SongRecord* out) {
     return FR_OK;
 }
 
-uint32_t FILEMANAGER::getSongCount() {
+uint32_t FileManager::getSongCount() {
     return songCount;
 }
 
-FRESULT FILEMANAGER::read_artist_by_index(uint32_t index, ArtistRecord* out) {
+FRESULT FileManager::read_artist_by_index(uint32_t index, ArtistRecord* out) {
     if (!out) return FR_INT_ERR;
 
     const FSIZE_t off = (FSIZE_t)index * ARTIST_RECORD_SIZE;
@@ -185,7 +185,7 @@ FRESULT FILEMANAGER::read_artist_by_index(uint32_t index, ArtistRecord* out) {
     return FR_OK;
 }
 
-FRESULT FILEMANAGER::read_album_by_index(uint32_t index, AlbumHeader* out) {
+FRESULT FileManager::read_album_by_index(uint32_t index, AlbumHeader* out) {
     if (!out) return FR_INT_ERR;
 
     const FSIZE_t off = (FSIZE_t)index * ALBUM_HEADER_SIZE;
@@ -199,7 +199,7 @@ FRESULT FILEMANAGER::read_album_by_index(uint32_t index, AlbumHeader* out) {
     return FR_OK; 
 }
 
-FRESULT FILEMANAGER::read_image_by_index(uint32_t index, uint8_t* out) {
+FRESULT FileManager::read_image_by_index(uint32_t index, uint8_t* out) {
     if (!out) return FR_INT_ERR;
     static const UINT IMAGE_BYTES = 3600u; // 120*120*2/8
 
@@ -209,7 +209,7 @@ FRESULT FILEMANAGER::read_image_by_index(uint32_t index, uint8_t* out) {
     return read_exact_at(&imagesDB, off, out, IMAGE_BYTES);
 }
 
-FRESULT FILEMANAGER::read_song_file(uint32_t index) {
+FRESULT FileManager::read_song_file(uint32_t index) {
     SongRecord selectedSong;
     FRESULT fr = read_song_by_index(index, &selectedSong);
     if (fr != FR_OK) return fr;
@@ -221,14 +221,14 @@ FRESULT FILEMANAGER::read_song_file(uint32_t index) {
     return f_open(&currentSongFile, fileName, FA_READ);
 }
 
-void FILEMANAGER::close_song_file() {
+void FileManager::close_song_file() {
     f_close(&currentSongFile);
 } 
 
 static inline void le32(uint8_t* p, uint32_t v) { p[0]=uint8_t(v); p[1]=uint8_t(v>>8); p[2]=uint8_t(v>>16); p[3]=uint8_t(v>>24); }
 static inline void le16(uint8_t* p, uint16_t v) { p[0]=uint8_t(v); p[1]=uint8_t(v>>8); }
 
-bool FILEMANAGER::wav_begin(const char* path, uint32_t sr, uint16_t ch, uint16_t bps) {
+bool FileManager::wav_begin(const char* path, uint32_t sr, uint16_t ch, uint16_t bps) {
     if (wav_open_) return false;
     FRESULT fr = f_open(&wav_fil_, path, FA_CREATE_ALWAYS | FA_WRITE);
     if (fr != FR_OK) return false;
@@ -259,7 +259,7 @@ bool FILEMANAGER::wav_begin(const char* path, uint32_t sr, uint16_t ch, uint16_t
     return true;
 }
 
-bool FILEMANAGER::wav_write_pcm_s16(const int16_t* interleaved, size_t frames) {
+bool FileManager::wav_write_pcm_s16(const int16_t* interleaved, size_t frames) {
     if (!wav_open_ || wav_bps_ != 16) return false;
     // write directly from caller's buffer; no big allocations
     const UINT bytes = (UINT)(frames * wav_ch_ * 2);
@@ -270,7 +270,7 @@ bool FILEMANAGER::wav_write_pcm_s16(const int16_t* interleaved, size_t frames) {
     return true;
 }
 
-void FILEMANAGER::wav_end() {
+void FileManager::wav_end() {
     if (!wav_open_) return;
     // Patch sizes: RIFF size at offset 4, data size at offset 40
     uint8_t sz4[4];

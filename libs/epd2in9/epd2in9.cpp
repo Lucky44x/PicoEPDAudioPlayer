@@ -72,7 +72,7 @@ UBYTE Gray4[159] =
 };
 
 //Public functions
-EPD2IN9::EPD2IN9(int RST, int DC, int CS, int BUSY, int CLK, int MOSI, spi_inst_t *port) {
+WaveshareEPD::WaveshareEPD(int RST, int DC, int CS, int BUSY, int CLK, int MOSI, spi_inst_t *port) {
     EPD_RST_PIN = RST;
     EPD_DC_PIN = DC;
     EPD_CS_PIN = CS;
@@ -86,7 +86,7 @@ EPD2IN9::EPD2IN9(int RST, int DC, int CS, int BUSY, int CLK, int MOSI, spi_inst_
 function :	Initialize B/W Waveform
 parameter:
 ******************************************************************************/
-void EPD2IN9::EPD_INIT() {
+void WaveshareEPD::EPD_INIT() {
     EPD_RESET();
     sleep_ms(100);
 
@@ -118,7 +118,7 @@ void EPD2IN9::EPD_INIT() {
 function :	Initialize Gray-Waveform
 parameter:
 ******************************************************************************/
-void EPD2IN9::EPD_GRAY_INIT() {
+void WaveshareEPD::EPD_GRAY_INIT() {
     EPD_RESET();
     sleep_ms(100);
 
@@ -149,7 +149,7 @@ void EPD2IN9::EPD_GRAY_INIT() {
 function :	Software reset
 parameter:
 ******************************************************************************/
-void EPD2IN9::EPD_RESET() {
+void WaveshareEPD::EPD_RESET() {
     EPD_DIGITAL_WRITE(EPD_RST_PIN, 1);
     sleep_ms(10);
     EPD_DIGITAL_WRITE(EPD_RST_PIN, 0);
@@ -158,7 +158,7 @@ void EPD2IN9::EPD_RESET() {
     sleep_ms(10);
 }
 
-void EPD2IN9::EPD_CLEAR() {
+void WaveshareEPD::EPD_CLEAR() {
     UWORD i;
 
     EPD_SEND_COMMAND(0x24); //Write RAM for b/w (0,1)
@@ -173,7 +173,7 @@ void EPD2IN9::EPD_CLEAR() {
     EPD_REFRESH_FULL();
 }
 
-void EPD2IN9::EPD_DISPLAY(UBYTE *Image) {
+void WaveshareEPD::EPD_DISPLAY(UBYTE *Image) {
 	UWORD i;	
 	EPD_SEND_COMMAND(0x24);   //write RAM for black(0)/white (1)
 	for ( i=0; i<4736; i++ )
@@ -183,7 +183,7 @@ void EPD2IN9::EPD_DISPLAY(UBYTE *Image) {
 	EPD_REFRESH_FULL();	
 }
 
-void EPD2IN9::EPD_DISPLAY_BASE(UBYTE *Image) {
+void WaveshareEPD::EPD_DISPLAY_BASE(UBYTE *Image) {
     UWORD i;
 
 	EPD_SEND_COMMAND(0x24);   //Write Black and White image to RAM
@@ -204,7 +204,7 @@ void EPD2IN9::EPD_DISPLAY_BASE(UBYTE *Image) {
  * Absolute Definition of MAGIC FUNCTION
  * Don't touch, think about or even look at this function... I beg you
  **/
-void EPD2IN9::EPD_DISPLAY_GRAY(UBYTE *Image) {
+void WaveshareEPD::EPD_DISPLAY_GRAY(UBYTE *Image) {
     UDOUBLE i,j,k;
     UBYTE temp1,temp2,temp3;
 
@@ -286,7 +286,7 @@ void EPD2IN9::EPD_DISPLAY_GRAY(UBYTE *Image) {
     EPD_REFRESH_FULL();
 }
 
-void EPD2IN9::EPD_DISPLAY_PARTIAL(UBYTE *Image) {
+void WaveshareEPD::EPD_DISPLAY_PARTIAL(UBYTE *Image) {
     UWORD i;
 
     //Reset
@@ -326,7 +326,7 @@ void EPD2IN9::EPD_DISPLAY_PARTIAL(UBYTE *Image) {
     EPD_REFRESH_PARTIAL();
 }
 
-void EPD2IN9::EPD_SLEEP() {
+void WaveshareEPD::EPD_SLEEP() {
     EPD_SEND_COMMAND(0x10); //Enter Deep Sleep
     EPD_SEND_DATA(0x01);
     sleep_ms(100);
@@ -336,7 +336,7 @@ void EPD2IN9::EPD_SLEEP() {
 function :	Refresh Display Full
 parameter:
 ******************************************************************************/
-void EPD2IN9::EPD_REFRESH_FULL() {
+void WaveshareEPD::EPD_REFRESH_FULL() {
     EPD_SEND_COMMAND(0x22); //Display Update Control
 	EPD_SEND_DATA(0xc7);
 	EPD_SEND_COMMAND(0x20); //Activate Display Update Sequence
@@ -347,7 +347,7 @@ void EPD2IN9::EPD_REFRESH_FULL() {
 function :	Refresh Display Partial
 parameter:
 ******************************************************************************/
-void EPD2IN9::EPD_REFRESH_PARTIAL() {
+void WaveshareEPD::EPD_REFRESH_PARTIAL() {
     EPD_SEND_COMMAND(0x22); //Display Update Control
 	EPD_SEND_DATA(0x0F);
 	EPD_SEND_COMMAND(0x20); //Activate Display Update Sequence
@@ -358,7 +358,7 @@ void EPD2IN9::EPD_REFRESH_PARTIAL() {
 function :	Setting the display window
 parameter:
 ******************************************************************************/
-void EPD2IN9::EPD_SET_PARTIAL(UWORD XStart, UWORD YStart, UWORD XEnd, UWORD YEnd) {
+void WaveshareEPD::EPD_SET_PARTIAL(UWORD XStart, UWORD YStart, UWORD XEnd, UWORD YEnd) {
     EPD_SEND_COMMAND(0x44); //Set Ram X Address
     EPD_SEND_DATA((XStart>>3) & 0xFF);
     EPD_SEND_DATA((XEnd>>3) & 0xFF);
@@ -374,7 +374,7 @@ void EPD2IN9::EPD_SET_PARTIAL(UWORD XStart, UWORD YStart, UWORD XEnd, UWORD YEnd
 function :	Set Cursor
 parameter:
 ******************************************************************************/
-void EPD2IN9::EPD_SET_CURSOR(UWORD XStart, UWORD YStart) {
+void WaveshareEPD::EPD_SET_CURSOR(UWORD XStart, UWORD YStart) {
     EPD_SEND_COMMAND(0x4E); //Set Ram X counter
     EPD_SEND_DATA(XStart & 0xFF);
 
@@ -390,7 +390,7 @@ function :	send command
 parameter:
      Reg : Command register
 ******************************************************************************/
-void EPD2IN9::EPD_SEND_COMMAND(UBYTE Reg) {
+void WaveshareEPD::EPD_SEND_COMMAND(UBYTE Reg) {
     EPD_DIGITAL_WRITE(EPD_DC_PIN, 0);
     EPD_DIGITAL_WRITE(EPD_CS_PIN, 0);
     EPD_SPI_WRITE(Reg);
@@ -402,7 +402,7 @@ function :	send data
 parameter:
     Data : Write data
 ******************************************************************************/
-void EPD2IN9::EPD_SEND_DATA(UBYTE Data) {
+void WaveshareEPD::EPD_SEND_DATA(UBYTE Data) {
     EPD_DIGITAL_WRITE(EPD_DC_PIN, 1);
     EPD_DIGITAL_WRITE(EPD_CS_PIN, 0);
     EPD_SPI_WRITE(Data);
@@ -413,7 +413,7 @@ void EPD2IN9::EPD_SEND_DATA(UBYTE Data) {
 function :	Wait until the busy_pin goes LOW
 parameter:
 ******************************************************************************/
-void EPD2IN9::EPD_READ_BUSY() {
+void WaveshareEPD::EPD_READ_BUSY() {
     printf("e-Paper busy\r\n");
     while(1) {
         //=1 Busy
@@ -424,7 +424,7 @@ void EPD2IN9::EPD_READ_BUSY() {
     }
 }
 
-void EPD2IN9::EPD_LUT(UBYTE *lut) {
+void WaveshareEPD::EPD_LUT(UBYTE *lut) {
     UBYTE count;
     EPD_SEND_COMMAND(0x32);
     for ( count=0; count<153; count++ ) {
@@ -434,7 +434,7 @@ void EPD2IN9::EPD_LUT(UBYTE *lut) {
 }
 
 //Magic function dont touch
-void EPD2IN9::EPD_LUT_BY_HOST(UBYTE *lut) {
+void WaveshareEPD::EPD_LUT_BY_HOST(UBYTE *lut) {
 	EPD_LUT((UBYTE *)lut);			//lut
 	EPD_SEND_COMMAND(0x3f);
 	EPD_SEND_DATA(*(lut+153));
@@ -449,19 +449,19 @@ void EPD2IN9::EPD_LUT_BY_HOST(UBYTE *lut) {
 }
 
 //Private functions
-void EPD2IN9::EPD_DIGITAL_WRITE(UWORD Pin, UBYTE Value) {
+void WaveshareEPD::EPD_DIGITAL_WRITE(UWORD Pin, UBYTE Value) {
     gpio_put(Pin, Value);
 }
 
-UBYTE EPD2IN9::EPD_DIGITAL_READ(UWORD Pin) {
+UBYTE WaveshareEPD::EPD_DIGITAL_READ(UWORD Pin) {
     return gpio_get(Pin);
 }
 
-void EPD2IN9::EPD_SPI_WRITE(UBYTE Value) {
+void WaveshareEPD::EPD_SPI_WRITE(UBYTE Value) {
     spi_write_blocking(EPD_PORT_SPI, &Value, 1);
 }
 
-void EPD2IN9::EPD_SPI_WRITE(uint8_t *data, uint32_t len) {
+void WaveshareEPD::EPD_SPI_WRITE(uint8_t *data, uint32_t len) {
     spi_write_blocking(EPD_PORT_SPI, data, len);
 }
 
@@ -470,7 +470,7 @@ function :	Enable Driver
 returns:    UBYTE - Error Code (0 - nominal)
 parameter:
 ******************************************************************************/
-UBYTE EPD2IN9::EPD_DRIVER_INIT() {
+UBYTE WaveshareEPD::EPD_DRIVER_INIT() {
     //GPIO Config
     EPD_GPIO_INIT();
     EPD_SPI_INIT();
@@ -479,29 +479,29 @@ UBYTE EPD2IN9::EPD_DRIVER_INIT() {
     return 0;
 }
 
-void EPD2IN9::EPD_DRIVER_EXIT() {
+void WaveshareEPD::EPD_DRIVER_EXIT() {
     //NOOP
 }
 
-void EPD2IN9::EPD_GPIO_INIT() {
+void WaveshareEPD::EPD_GPIO_INIT() {
     EPD_GPIO_MODE(EPD_RST_PIN, 1);
     EPD_GPIO_MODE(EPD_DC_PIN, 1);
     EPD_GPIO_MODE(EPD_CS_PIN, 1);
     EPD_GPIO_MODE(EPD_BUSY_PIN, 0);
 }
 
-void EPD2IN9::EPD_GPIO_MODE(UWORD Pin, UWORD Mode) {
+void WaveshareEPD::EPD_GPIO_MODE(UWORD Pin, UWORD Mode) {
     gpio_init(Pin);
     gpio_set_dir(Pin, Mode == 0 ? GPIO_IN : GPIO_OUT);
 }
 
-void EPD2IN9::EPD_SPI_INIT() {
+void WaveshareEPD::EPD_SPI_INIT() {
     spi_init(EPD_PORT_SPI, 4000 * 1000);
     gpio_set_function(EPD_CLK_PIN, GPIO_FUNC_SPI);
     gpio_set_function(EPD_MOSI_PIN, GPIO_FUNC_SPI);
 }
 
-void EPD2IN9::EPD_SPI_SEND_DATA(UBYTE Reg) {
+void WaveshareEPD::EPD_SPI_SEND_DATA(UBYTE Reg) {
     UBYTE i,j=Reg;
     EPD_GPIO_MODE(EPD_MOSI_PIN, 1);
     EPD_GPIO_MODE(EPD_CLK_PIN, 1);
@@ -521,7 +521,7 @@ void EPD2IN9::EPD_SPI_SEND_DATA(UBYTE Reg) {
     EPD_DIGITAL_WRITE(EPD_CS_PIN, 1);
 }
 
-UBYTE EPD2IN9::EPD_SPI_READ_DATA() {
+UBYTE WaveshareEPD::EPD_SPI_READ_DATA() {
     UBYTE i,j=0xff;
     EPD_GPIO_MODE(EPD_MOSI_PIN, 0);
     EPD_GPIO_MODE(EPD_CLK_PIN, 1);

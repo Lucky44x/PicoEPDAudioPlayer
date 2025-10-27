@@ -6,11 +6,11 @@ extern "C" {
     extern const uint8_t _binary_fonts_unifont_bin_end[];
 }
 
-EPRENDERER::EPRENDERER() {}
+EPDRenderer::EPDRenderer() {}
 
-void EPRENDERER::Init(UWORD grayLevels, UWORD Rotation, UWORD Color) {
+void EPDRenderer::Init(UWORD grayLevels, UWORD Rotation, UWORD Color) {
     //Setup Driver
-    Driver = EPD2IN9();
+    Driver = WaveshareEPD();
     if (Driver.EPD_DRIVER_INIT() != 0) {
         return;
     }
@@ -52,13 +52,13 @@ void EPRENDERER::Init(UWORD grayLevels, UWORD Rotation, UWORD Color) {
     }
 }
 
-void EPRENDERER::Destroy() {
+void EPDRenderer::Destroy() {
     free(Canvas.fB);
 }
 
-void EPRENDERER::SetRotation(UWORD Rotation) { Canvas.Rotation = Rotation; }
-void EPRENDERER::SetMirroring(UBYTE Mirror) { Canvas.Mirror = Mirror; }
-void EPRENDERER::SetScale(UBYTE Scale) {
+void EPDRenderer::SetRotation(UWORD Rotation) { Canvas.Rotation = Rotation; }
+void EPDRenderer::SetMirroring(UBYTE Mirror) { Canvas.Mirror = Mirror; }
+void EPDRenderer::SetScale(UBYTE Scale) {
     if ( Scale == 2 ) {
         Canvas.Scale = Scale;
         Canvas.WidthByte = (Canvas.WidthMemory % 8 == 0) ? (Canvas.WidthMemory / 8) : (Canvas.WidthMemory / 8 + 1);
@@ -68,7 +68,7 @@ void EPRENDERER::SetScale(UBYTE Scale) {
     }
 }
 
-void EPRENDERER::RefreshScreen() {
+void EPDRenderer::RefreshScreen() {
     if (Canvas.Scale == 4) {
         Driver.EPD_DISPLAY_GRAY(Canvas.fB);
     } else {
@@ -76,7 +76,7 @@ void EPRENDERER::RefreshScreen() {
     }
 }
 
-void EPRENDERER::SetPixel(UWORD Xpoint, UWORD Ypoint, UWORD Color) {
+void EPDRenderer::SetPixel(UWORD Xpoint, UWORD Ypoint, UWORD Color) {
     if (Xpoint > Canvas.Width || Ypoint > Canvas.Height) { return; }
     UWORD X, Y;
 
@@ -137,7 +137,7 @@ void EPRENDERER::SetPixel(UWORD Xpoint, UWORD Ypoint, UWORD Color) {
     }
 }
 
-void EPRENDERER::Clear(UWORD Color) {
+void EPDRenderer::Clear(UWORD Color) {
     if (Canvas.Scale == 2) {
         for (UWORD Y = 0; Y < Canvas.HeightByte; Y++) {
             for (UWORD X = 0; X < Canvas.WidthByte; X++) {
@@ -157,7 +157,7 @@ void EPRENDERER::Clear(UWORD Color) {
     }
 }
 
-void EPRENDERER::ClearPartial(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend, UWORD Color) {
+void EPDRenderer::ClearPartial(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend, UWORD Color) {
     UWORD X,Y;
     for(Y = Ystart; Y < Yend; Y++) {
         for(X = Xstart; X < Xend; X++) {
@@ -166,7 +166,7 @@ void EPRENDERER::ClearPartial(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend
     }
 }
 
-void EPRENDERER::DrawPoint(UWORD Xpoint, UWORD Ypoint, UWORD Color, DOT_PIXEL PixelStyle, DOT_STYLE FillStyle) {
+void EPDRenderer::DrawPoint(UWORD Xpoint, UWORD Ypoint, UWORD Color, DOT_PIXEL PixelStyle, DOT_STYLE FillStyle) {
     if ( Xpoint > Canvas.Width || Ypoint > Canvas.Height ) return;
 
     int16_t XDir_Num, YDir_Num;
@@ -188,7 +188,7 @@ void EPRENDERER::DrawPoint(UWORD Xpoint, UWORD Ypoint, UWORD Color, DOT_PIXEL Pi
     }
 }
 
-void EPRENDERER::DrawLine(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend, UWORD Color, DOT_PIXEL LineWidth, LINE_STYLE LineStyle) {
+void EPDRenderer::DrawLine(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend, UWORD Color, DOT_PIXEL LineWidth, LINE_STYLE LineStyle) {
     if ( Xstart > Canvas.Width || Ystart > Canvas.Height || Xend > Canvas.Width || Yend > Canvas.Height ) return;
 
     UWORD Xpoint = Xstart;
@@ -229,7 +229,7 @@ void EPRENDERER::DrawLine(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend, UW
     }
 }
 
-void EPRENDERER::DrawRect(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend, UWORD Color, DOT_PIXEL LineWidth, DRAW_FILL FillStyle) {
+void EPDRenderer::DrawRect(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend, UWORD Color, DOT_PIXEL LineWidth, DRAW_FILL FillStyle) {
     if ( Xstart > Canvas.Width || Ystart > Canvas.Height || Xend > Canvas.Width || Yend > Canvas.Height ) return;
 
     if (FillStyle) {
@@ -245,7 +245,7 @@ void EPRENDERER::DrawRect(UWORD Xstart, UWORD Ystart, UWORD Xend, UWORD Yend, UW
     }
 }
 
-void EPRENDERER::DrawCircle(UWORD Xcenter, UWORD Ycenter, UWORD Radius, UWORD Color, DOT_PIXEL LineWidth, DRAW_FILL FillStyle) {
+void EPDRenderer::DrawCircle(UWORD Xcenter, UWORD Ycenter, UWORD Radius, UWORD Color, DOT_PIXEL LineWidth, DRAW_FILL FillStyle) {
     if ( Xcenter > Canvas.Width || Ycenter >= Canvas.Height ) return;
     
     //Draw a circle from(0, R) as a starting point
@@ -299,7 +299,7 @@ void EPRENDERER::DrawCircle(UWORD Xcenter, UWORD Ycenter, UWORD Radius, UWORD Co
     }
 }
 
-uint8_t EPRENDERER::DrawChar(UWORD uChar, UWORD xPoint, UWORD yPoint, UWORD color) {
+uint8_t EPDRenderer::DrawChar(UWORD uChar, UWORD xPoint, UWORD yPoint, UWORD color) {
     const uint8_t* font = _binary_fonts_unifont_bin_start;
 
     //Sanity check: char must be in BMP (U+0000 - U+FFFF)
@@ -342,7 +342,7 @@ uint8_t EPRENDERER::DrawChar(UWORD uChar, UWORD xPoint, UWORD yPoint, UWORD colo
     return width;
 }
 
-void EPRENDERER::DrawText(const UWORD* text, size_t length, UWORD xPoint, UWORD yPoint, UWORD color, UBYTE spacing, UWORD max_text_area) {
+void EPDRenderer::DrawText(const UWORD* text, size_t length, UWORD xPoint, UWORD yPoint, UWORD color, UBYTE spacing, UWORD max_text_area) {
     UWORD x = xPoint;
     UWORD used_width = 0;
 
@@ -375,7 +375,7 @@ void EPRENDERER::DrawText(const UWORD* text, size_t length, UWORD xPoint, UWORD 
     }
 }
 
-uint8_t EPRENDERER::GetCharWidth(UWORD uChar) {
+uint8_t EPDRenderer::GetCharWidth(UWORD uChar) {
     const uint8_t* font = _binary_fonts_unifont_bin_start;
 
     //Sanity check: char must be in BMP (U+0000 - U+FFFF)
@@ -400,7 +400,7 @@ uint8_t EPRENDERER::GetCharWidth(UWORD uChar) {
     return width;
 }
 
-void EPRENDERER::DrawBitmap(const uint8_t* image_buffer, UWORD xPoint, UWORD yPoint, UWORD width, UWORD height) {
+void EPDRenderer::DrawBitmap(const uint8_t* image_buffer, UWORD xPoint, UWORD yPoint, UWORD width, UWORD height) {
     if (!image_buffer) return;
 
     for (UWORD y = 0; y < height; ++y) {

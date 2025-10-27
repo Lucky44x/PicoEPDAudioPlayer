@@ -3,7 +3,6 @@
 #include "pico/stdlib.h"
 #include "epdDraw.h"
 #include "fileManager.h"
-#include "audioManager.h"
 #include <string.h>
 
 extern "C" {
@@ -67,55 +66,54 @@ void print_hex(const char* label, const uint8_t* data, size_t len) {
     printf("\n");
 }
 
-EPRENDERER Renderer;
-FILEMANAGER FileManager = FILEMANAGER();
-AUDIOMANAGER AudioManager = AUDIOMANAGER(FileManager);
+EPDRenderer renderer;
+FileManager fileManager = FileManager();
 
 void drawSongInfo(SongRecord song) {
     size_t name_len = cp_len_0term(song.name, SONG_NAME_CODEPOINTS);
-    Renderer.DrawText(song.name, name_len, 126, 46, GRAY4, 2);
+    renderer.DrawText(song.name, name_len, 126, 46, GRAY4, 2);
 
     ArtistRecord artist{};
-    FRESULT fr = FileManager.read_artist_by_index(song.artist_id, &artist);
+    FRESULT fr = fileManager.read_artist_by_index(song.artist_id, &artist);
     if (fr != FR_OK) panic("Error while reading artist");
 
     name_len = cp_len_0term(artist.name, ARTIST_NAME_CODEPOINTS);
-    Renderer.DrawText(artist.name, name_len, 126, 60, GRAY4, 2);
+    renderer.DrawText(artist.name, name_len, 126, 60, GRAY4, 2);
 
     uint8_t imageData[3600];
-    fr = FileManager.read_image_by_index(song.image_id, imageData);
+    fr = fileManager.read_image_by_index(song.image_id, imageData);
     if (fr != FR_OK) panic("Error while reading artist");
 
-    Renderer.DrawBitmap(imageData, 0, 4, 120, 120);
+    renderer.DrawBitmap(imageData, 0, 4, 120, 120);
 }
 
 void drawMenuCorner(int currentMenu) {
     for(int menu = 0; menu < MENUS; menu++) {
         int xCoord = 296 - (16 * menu);
-        Renderer.DrawRect(xCoord - 16, 0, xCoord, 16, BLACK, DOT_PIXEL_1X1, menu == currentMenu ? DRAW_FILL_FULL : DRAW_FILL_EMPTY);
-        Renderer.DrawChar(menuSymbols[menu], xCoord - 12, 0, menu == currentMenu ? WHITE : BLACK);
+        renderer.DrawRect(xCoord - 16, 0, xCoord, 16, BLACK, DOT_PIXEL_1X1, menu == currentMenu ? DRAW_FILL_FULL : DRAW_FILL_EMPTY);
+        renderer.DrawChar(menuSymbols[menu], xCoord - 12, 0, menu == currentMenu ? WHITE : BLACK);
     }
 }
 
 void drawSongMenu(uint32_t songIndex) {
     SongRecord currentSong{};
-    FRESULT fr = FileManager.read_song_by_index(songIndex, &currentSong);
+    FRESULT fr = fileManager.read_song_by_index(songIndex, &currentSong);
     if (fr != FR_OK) panic("Could not load song %u", songIndex);
     drawSongInfo(currentSong);
     size_t name_len = 0;
 
     //Draw Song Above
     if (songIndex > 0) {
-        fr = FileManager.read_song_by_index(songIndex - 1, &currentSong);
+        fr = fileManager.read_song_by_index(songIndex - 1, &currentSong);
         name_len = cp_len_0term(currentSong.name, SONG_NAME_CODEPOINTS);
-        Renderer.DrawText(currentSong.name, name_len, 126, 18, GRAY3, 2);
+        renderer.DrawText(currentSong.name, name_len, 126, 18, GRAY3, 2);
     }
 
     //Draw Song Below
-    if (songIndex < FileManager.getSongCount() - 1) {
-        fr = FileManager.read_song_by_index(songIndex + 1, &currentSong);
+    if (songIndex < fileManager.getSongCount() - 1) {
+        fr = fileManager.read_song_by_index(songIndex + 1, &currentSong);
         name_len = cp_len_0term(currentSong.name, SONG_NAME_CODEPOINTS);
-        Renderer.DrawText(currentSong.name, name_len, 126, 88, GRAY3, 2);
+        renderer.DrawText(currentSong.name, name_len, 126, 88, GRAY3, 2);
     }
 
     drawMenuCorner(2);
@@ -126,25 +124,22 @@ int main()
     stdio_init_all();
     sleep_ms(10000);
 
-    FRESULT initResult = FileManager.init_file_system();
+    FRESULT initResult = fileManager.init_file_system();
     if (initResult != FR_OK) {
         return 1;
     }
 
     //Setup Renderer
-    Renderer = EPRENDERER();
-    Renderer.Init(4, ROTATE_270, GRAY4);
+    renderer = EPDRenderer();
+    renderer.Init(4, ROTATE_270, GRAY4);
     //Reset the Screen
-    Renderer.Clear(WHITE);
+    renderer.Clear(WHITE);
 
     drawSongMenu(8);
-    Renderer.RefreshScreen();
+    renderer.RefreshScreen();
 
     //Do Music shit
-    AudioManager.play_song(0);
-    //AudioManager.test();
-
-    //AudioManager.play_first_frames(0, 4096);
+    //AudioManager.play_song(0);
 
     while (true) {
         printf("Hello, world!\n");

@@ -58,9 +58,9 @@ static inline size_t cp_len_0term(const uint16_t* s, size_t max_cp) {
     return i;
 }
 
-class FILEMANAGER {
+class FileManager {
     public:
-    FILEMANAGER();
+        FileManager();
         FRESULT init_file_system();
         FRESULT deinit_file_system();
         FRESULT read_song_by_index (uint32_t index, SongRecord* out);

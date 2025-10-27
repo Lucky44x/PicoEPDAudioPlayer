@@ -70,9 +70,9 @@ typedef enum {
     DRAW_FILL_FULL,
 } DRAW_FILL;
 
-class EPRENDERER {
+class EPDRenderer {
     public:
-        EPRENDERER();
+        EPDRenderer();
         void Init(UWORD grayLevels, UWORD Rotation = ROTATE_90, UWORD Color = GRAY4);
         void Destroy();
 
@@ -115,7 +115,7 @@ class EPRENDERER {
         } CANVAS;
         
         CANVAS Canvas;
-        EPD2IN9 Driver;
+        WaveshareEPD Driver;
 };
 
 #endif  //EPDDRAW

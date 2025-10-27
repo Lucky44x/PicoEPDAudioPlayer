@@ -15,9 +15,9 @@
 #define UWORD   uint16_t
 #define UDOUBLE uint32_t
 
-class EPD2IN9 {
+class WaveshareEPD {
 public:
-    EPD2IN9(int RST = 20, int DC = 16, int CS = 17, int BUSY = 21, int CLK = 18, int MOSI = 19, spi_inst_t *port = (spi_inst_t*)spi0);
+    WaveshareEPD(int RST = 20, int DC = 16, int CS = 17, int BUSY = 21, int CLK = 18, int MOSI = 19, spi_inst_t *port = (spi_inst_t*)spi0);
     //Define EPD-Specific Functions
     void EPD_INIT();
     void EPD_GRAY_INIT();
