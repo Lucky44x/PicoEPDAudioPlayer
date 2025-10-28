@@ -41,6 +41,7 @@ pico_sdk_init()
 
 add_executable(EinkWavPlayer 
     src/EinkWavPlayer.cpp
+    src/UIMenus.cpp
 )
 
 pico_set_program_name(EinkWavPlayer "EinkWavPlayer")
