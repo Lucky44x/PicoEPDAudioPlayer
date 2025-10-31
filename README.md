@@ -19,7 +19,7 @@ The current Plan is as follows:
 - Core1 Will read those frames from the ring-buffer in shared memory
 - Core1 Will feed the DAC via a PIO programm and hardware interrupt, to facillitate the high frequencies needed for wav playback  
   
-This does solve the stalling issue I have experienced on the 1st. implementation, however it comes with one drawback:  
+This should solve the stalling issue I have experienced on the 1st. implementation, however it comes with one drawback:  
   
 Due to the nature of E-Ink-Displays/EPDs the library I am using and modified to fit my needs, will block execution until a command to the EPD is done. This means screen refreshes (which can take up to a second) **will** halt all other code on that core.  
 Since I do not want the Audio-Playback to halt, I will need the UI-Calls to come from Core0, but if these happened during playback, the file-reader would still be halted...  
