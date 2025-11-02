@@ -1,0 +1,6 @@
+[submodule "pico_audio_i2s_32b"]
+	path = pico_audio_i2s_32b
+	url = https://github.com/elehobica/pico_audio_i2s_32b.git
+[submodule "libs/audioPlayer/pico_audio_i2s_32b"]
+	path = libs/audioPlayer/pico_audio_i2s_32b
+	url = https://github.com/elehobica/pico_audio_i2s_32b.git
