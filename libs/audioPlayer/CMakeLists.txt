@@ -1,7 +1,5 @@
 project(audioPlayer)
 
-add_compile_definitions(CORE1_PROCESS_I2S_CALLBACK)
-
 add_library(audioPlayer STATIC audioPlayer.c)
 
 add_library(pico_util_buffer STATIC
