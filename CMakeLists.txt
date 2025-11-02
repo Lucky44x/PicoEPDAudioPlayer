@@ -53,7 +53,8 @@ pico_enable_stdio_uart(EinkWavPlayer 0)
 pico_enable_stdio_usb(EinkWavPlayer 1)
 
 # Add sub-dirs
-add_subdirectory(libs/epdDraw)
+add_subdirectory(libs/epdDraw/)
+add_subdirectory(libs/audioPlayer/)
 
 # Add the standard library to the build
 target_link_libraries(EinkWavPlayer pico_stdlib)
@@ -65,6 +66,7 @@ target_include_directories(EinkWavPlayer PRIVATE
 
 target_link_libraries(EinkWavPlayer
     epdDraw
+    audioPlayer
 )
 
 pico_add_extra_outputs(EinkWavPlayer)
