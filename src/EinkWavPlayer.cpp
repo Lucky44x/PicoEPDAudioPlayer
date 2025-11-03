@@ -2,10 +2,12 @@
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 
+#include "files.h"
 #include "AudioCore.h"
 
 audio_player_handle_t g_player;
 AudioCore *g_core = nullptr;
+FileManager fileManager;
 
 void core1_entry() {
     audio_player_config_t cfg = {
@@ -27,13 +29,22 @@ void core1_entry() {
 
     // signal core0 that AudioPlayer is ready
     multicore_fifo_push_blocking(0xA11D0);   // any magic value you like
-    while(true) { printf("Hello from core1"); sleep_ms(100); }
+    while(true) { sleep_ms(100); }
 }
 
 int main()
 {
     stdio_init_all();
     sleep_ms(5000); //Allow USB serial
+
+    printf("Launching File-System..\n");
+    fileManager = FileManager();
+    FRESULT fileManager_ok = fileManager.init();
+    if (fileManager_ok != FR_OK) {
+        printf("Failed to initialize File-Manager %u", fileManager_ok);
+        return 1;
+    }
+
     printf("Starting Audio Test\n");
 
     // Launch DAC-Thread
@@ -55,7 +66,15 @@ int main()
         while(true) sleep_ms(100);
     }
 
-    printf("Tone test started..\n");
+    printf("Tone test started.. -- Reading File\n");
+    song_record_t test;
+    FRESULT file_ok = fileManager.read_song_index(0, &test);
+    if (file_ok != FR_OK) {
+        printf("Error during FILE-READ: %u", file_ok);
+        return 1;
+    }
+
+    printf("Read song 0 : %u", test.name);
 
     while (true) {
         core.pump();
