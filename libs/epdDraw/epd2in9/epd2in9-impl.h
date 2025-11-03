@@ -77,7 +77,6 @@ static uint8_t Gray4[159] =
 // EPD-Specific Driver functions
 void epd_send_command(epd_config_t *cfg, uint8_t reg);
 void epd_send_data(epd_config_t *cfg, uint8_t data);
-void epd_send_data_len(epd_config_t *cfg, uint8_t data);
 void epd_read_busy(epd_config_t *cfg);
 void epd_lut(epd_config_t *cfg, uint8_t *lut);
 void epd_lut_by_host(epd_config_t *cfg, uint8_t *lut);
@@ -95,69 +94,5 @@ void epd_spi_send_data(epd_config_t *cfg, uint8_t reg);
 uint8_t epd_spi_read_data(epd_config_t *cfg);
 
 void epd_gpio_mode(uint16_t pin, uint8_t mode);
-
-static void epd_queue_busy(epd_config_t *cfg) {
-    epd_packet_t pkt = {
-        .type = PACKET_WAIT_BUSY
-    };
-    epd_queue_push(cfg, &pkt);
-}
-
-static bool epd_queue_empty(epd_config_t *cfg) { return cfg->queue_head == cfg->queue_tail; }
-
-static bool epd_queue_pop(epd_config_t *cfg, epd_packet_t *pkt) {
-    if (cfg->queue_tail == cfg->queue_head) return false;
-    *pkt = cfg->q_packets[cfg->queue_tail];
-    cfg->queue_tail = (uint8_t)(cfg->queue_tail + 1) % EPD_JOBS_MAX;
-    return true;
-
-}
-
-static bool epd_queue_peek(epd_config_t *cfg, epd_packet_t *pkt) {
-    if (cfg->queue_tail == cfg->queue_head) return false;
-    *pkt = cfg->q_packets[cfg->queue_tail];
-    return true;
-}
-
-static bool epd_queue_push(epd_config_t *cfg, epd_packet_t *pkt) {
-    uint8_t n = (uint8_t)(cfg->queue_head + 1) % EPD_JOBS_MAX;
-    if (n == cfg->queue_tail) return false;
-    cfg->q_packets[cfg->queue_head] = *pkt;
-    cfg->queue_head = n;
-    return true;
-}
-
-static bool epd_flush_until_idle(epd_config_t *cfg, uint32_t timeout_us) {
-    absolute_time_t t0 = get_absolute_time();
-    while (!epd_queue_empty(cfg)) {
-        epd_service_async(cfg, 2000); // 2 ms slices
-        if ((uint32_t)absolute_time_diff_us(t0, get_absolute_time()) > timeout_us)
-            return false;
-    }
-    return true;
-}
-
-static bool epd_queue_push_copy_small(epd_config_t *cfg, const epd_packet_t *p_in, const uint8_t *src, uint32_t len) {
-    epd_packet_t p = *p_in;
-    if (len <= sizeof p.small) {
-        memcpy(p.small, src, len);
-        p.bytes = p.small;
-        p.len   = len;
-        p.use_small = true;
-        return epd_queue_push(cfg, &p);
-    } else {
-        // fall back to pointer-based; caller must guarantee lifetime
-        return epd_queue_push(cfg, p_in);
-    }
-}
-
-static bool epd_queue_advance_head(epd_config_t *cfg, uint32_t n) {
-    if (cfg->queue_tail == cfg->queue_head) return false;
-    cfg->q_packets[cfg->queue_tail].pos += n;
-}
-
-static inline bool epd_busy_low(epd_config_t *cfg) {
-    return epd_digital_read(cfg->pin_busy) == 0;
-}
 
 #endif //EPD_2IN9_H

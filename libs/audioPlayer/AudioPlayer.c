@@ -78,10 +78,6 @@ void audio_player_stop(audio_player_handle_t *h) {
     h->running = false;
 }
 
-void audio_player_mute(bool muted) {
-    if (xsmt_pin != 0xFFFF) gpio_put(xsmt_pin, muted ? 0 : 1);  // mute if defined
-}
-
 // Helpers
 audio_buffer_pool_t* audio_player_get_producer(audio_player_handle_t *h) {
     return h ? h->producer_pool : NULL;

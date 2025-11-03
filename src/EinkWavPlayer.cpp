@@ -34,8 +34,6 @@ void core1_entry() {
 
 int main()
 {
-    int current_song = 0;
-
     stdio_init_all();
     sleep_ms(5000); //Allow USB serial
 
@@ -60,26 +58,20 @@ int main()
     }
     printf("Core1 ready... Launching Audio-Core");
     g_core = AudioCore(&g_player, &fileManager);
-
-    if (!g_core.open()) {
-        printf("Audio core could not start");
+    
+    if (!g_core.open_song(0)) {
+        printf("Could not open song 0 from disk");
         while(true) sleep_ms(100);
     }
 
-    if (!g_core.start_song(0)) {
-        printf("Could not open song 0 from disk");
+    if (!g_core.start()) {
+        printf("Audio core could not start");
         while(true) sleep_ms(100);
     }
 
     printf("Tone test started..\n");
 
     while (true) {
-        if (g_core.awaitingNext()) { 
-            g_core.mute(true);
-            if (!g_core.start_song(++current_song)) break;
-            g_core.mute(false);
-        }
-
         g_core.pump();
         //printf("test");
         sleep_ms(1);
