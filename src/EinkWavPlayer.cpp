@@ -6,7 +6,7 @@
 #include "AudioCore.h"
 
 audio_player_handle_t g_player;
-AudioCore *g_core = nullptr;
+AudioCore g_core;
 FileManager fileManager;
 
 void core1_entry() {
@@ -40,6 +40,7 @@ int main()
     printf("Launching File-System..\n");
     fileManager = FileManager();
     FRESULT fileManager_ok = fileManager.init();
+
     if (fileManager_ok != FR_OK) {
         printf("Failed to initialize File-Manager %u", fileManager_ok);
         return 1;
@@ -55,29 +56,23 @@ int main()
         printf("Core1 init failed");
         while(true) sleep_ms(100);
     }
-    printf("Core1 ready");
+    printf("Core1 ready... Launching Audio-Core");
+    g_core = AudioCore(&g_player, &fileManager);
+    
+    if (!g_core.open_song(0)) {
+        printf("Could not open song 0 from disk");
+        while(true) sleep_ms(100);
+    }
 
-    static AudioCore core(&g_player);
-    g_core = &core;
-
-    core.configure(323.6f, 44100);
-    if (!core.start()) {
+    if (!g_core.start()) {
         printf("Audio core could not start");
         while(true) sleep_ms(100);
     }
 
-    printf("Tone test started.. -- Reading File\n");
-    song_record_t test;
-    FRESULT file_ok = fileManager.read_song_index(0, &test);
-    if (file_ok != FR_OK) {
-        printf("Error during FILE-READ: %u", file_ok);
-        return 1;
-    }
-
-    printf("Read song 0 : %u", test.name);
+    printf("Tone test started..\n");
 
     while (true) {
-        core.pump();
+        g_core.pump();
         //printf("test");
         sleep_ms(1);
     }

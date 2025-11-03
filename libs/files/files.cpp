@@ -4,8 +4,6 @@
 #include <stdlib.h>
 #include "pico/stdlib.h"
 
-#include "dr_wav.h"
-
 static inline void le32(uint8_t* p, uint32_t v) { p[0]=uint8_t(v); p[1]=uint8_t(v>>8); p[2]=uint8_t(v>>16); p[3]=uint8_t(v>>24); }
 static inline void le16(uint8_t* p, uint16_t v) { p[0]=uint8_t(v); p[1]=uint8_t(v>>8); }
 
@@ -243,35 +241,4 @@ FRESULT FileManager::open_song_file(uint32_t index) {
 
 void FileManager::close_song_file() {
     f_close(&current_song_file);
-}
-
-//DR_WAV specific implementations
-static size_t wav_read(void* ud, void* out, size_t bytes_to_read) {
-    FIL* fil = (FIL*)ud;
-    UINT br = 0;
-    FRESULT fr = f_read(fil, out, (UINT)bytes_to_read, &br);
-    if (fr != FR_OK && br == 0) return 0;
-    return (size_t)br;
-}
-
-static drwav_bool32 wav_seek(void *ud, int offset, drwav_seek_origin origin) {
-    FIL* f = (FIL*)ud;
-    FSIZE_t cur  = f_tell(f);
-    FSIZE_t size = f_size(f);
-
-    int64_t base =
-        (origin == DRWAV_SEEK_SET)  ? 0 :
-        (origin == DRWAV_SEEK_CUR)  ? (int64_t)cur :
-                                    (int64_t)size; // if your dr_wav defines SEEK_END
-
-    int64_t target = base + (int64_t)offset;
-    if (target < 0 || target > (int64_t)size) return DRWAV_FALSE;
-
-    return (f_lseek(f, (FSIZE_t)target) == FR_OK) ? DRWAV_TRUE : DRWAV_FALSE;
-}
-
-static drwav_bool32 wav_tell(void* pUserData, drwav_int64* pCursor) {
-    FIL* f = (FIL*)pUserData;
-    *pCursor = (drwav_int64)f_tell(f);
-    return DRWAV_TRUE;
 }

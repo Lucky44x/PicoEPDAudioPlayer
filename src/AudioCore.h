@@ -1,32 +1,33 @@
 #ifndef AUDIOCORE_H
 #define AUDIOCORE_H
 
+#include "files.h"
+#include "dr_wav.h"
+
 extern "C" {
 #include "audioPlayer.h"
 }
 
 class AudioCore {
     public:
-        explicit AudioCore(audio_player_handle_t *player) : player_(player) {}
+        AudioCore();
+        explicit AudioCore(audio_player_handle_t *player, FileManager *fm) : m_player(player), m_fm(fm) {}
 
-        void configure(float freq_hz, uint32_t sample_rate_hz);
+        bool open_song(uint32_t song_index);
+
         bool start();
         void stop();
         void pump();
-        void setFrequency(float freq_hz);
     private:
-        void _recalcPhaseIncrement();
+        //File
+        drwav m_wav;
 
-        bool running_ = false;
-        audio_player_handle_t *player_ = nullptr;
+        //Stream Data
+        bool m_running = false;
 
-        double phase_ = 0.0;
-        double phase_inc_ = 0.0;
-        float freq_hz_ = 323.6f;
-        uint32_t sample_rate_ = 44100;
-
-        // amplitude
-        int16_t amplitude_ = 28000;
+        //Instances
+        audio_player_handle_t *m_player = nullptr;
+        FileManager *m_fm = nullptr;
 };
 
 #endif  //AUDIOCORE_H
