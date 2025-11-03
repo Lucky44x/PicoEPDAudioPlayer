@@ -1,7 +1,44 @@
 #include "epd2in9-impl.h"
 
-#define EPD_WIDTH   128
-#define EPD_HEIGHT  296
+#define EPD_WIDTH   128u
+#define EPD_HEIGHT  296u
+#define EPD_PIX (EPD_WIDTH * EPD_HEIGHT)
+#define EPD_2B (EPD_PIX / 4u)
+#define EPD_1B (EPD_PIX / 8u)
+
+
+/* Convert 2bpp -> 1bpp for one plane into a staging buffer.
+   - src2bpp points to the whole 2bpp image (9472 B), row-major, MSB-first per byte.
+   - out_bytes is how many output bytes to produce this call (<= EPD_1B).
+   - out_off is the output-byte offset (0..EPD_1B-1). We read 2*out_bytes from src starting at 2*out_off.
+   - plane_bit: 0 = use LSB (for cmd 0x24), 1 = use MSB (for cmd 0x26).
+   - We invert the chosen bit to match your “==0 → 1” mapping from the original code. */
+static void pack_2bpp_plane(const uint8_t *src2bpp, uint32_t out_off, uint8_t *dst1bpp, uint32_t out_bytes, int plane_bit)
+{
+    const uint32_t in_off = out_off * 2u; // 2B of 2bpp produce 1B of 1bpp
+    const uint8_t *in = src2bpp + in_off;
+    for (uint32_t i = 0; i < out_bytes; ++i) {
+        uint8_t b0 = in[0], b1 = in[1];   // 8 pixels = 16 bits = 2 bytes (MSB-first pairs)
+        uint8_t out = 0;
+        // Extract 8 consecutive 2-bit pixels from b0/b1 (MSB first): 11,00,10,01, then repeat
+        // Build output MSB->LSB
+        for (int pix = 0; pix < 8; ++pix) {
+            // Which source bit pair are we at?
+            // For pix 0..3 take from b0; pix 4..7 from b1.
+            uint8_t byte = (pix < 4) ? b0 : b1;
+            int shift = 6 - 2 * (pix & 3);        // 6,4,2,0 then again
+            uint8_t two = (byte >> shift) & 0x3;  // [MSB:bit1, LSB:bit0]
+
+            uint8_t bit = (plane_bit == 0) ? (two & 1u)         // LSB
+                                           : ((two >> 1) & 1u); // MSB
+            bit ^= 1u; // invert to match your mapping (00/10 → 1 for 0x24; 00/01 → 1 for 0x26, etc.)
+
+            out = (uint8_t)((out << 1) | bit);
+        }
+        dst1bpp[i] = out;
+        in += 2; // next 8 pixels = next 2 bytes of 2bpp
+    }
+}
 
 /******************************************************************************
 function :	Build config for EPD-Driver
@@ -26,11 +63,13 @@ parameter:  cfg
 ******************************************************************************/
 void epd_init(epd_config_t *cfg) {
     epd_reset(cfg);
-    sleep_ms(100);
+    epd_packet_t slp_pkt = {.type=PACKET_WAIT,.len=100};
+    epd_queue_push(cfg, &slp_pkt);
+    epd_flush_until_idle(cfg, 100000); //100ms timeout
 
-    epd_read_busy(cfg);
+    epd_queue_busy(cfg);
     epd_send_command(cfg, 0x12); // Soft-Reset
-    epd_read_busy(cfg);
+    epd_queue_busy(cfg);
 
     epd_send_command(cfg, 0x01); // Driver output control
     epd_send_data(cfg, 0x27);
@@ -47,7 +86,7 @@ void epd_init(epd_config_t *cfg) {
     epd_send_data(cfg, 0x80);
 
     epd_set_cursor(cfg, 0,0);
-    epd_read_busy(cfg);
+    epd_queue_busy(cfg);
 
     epd_lut_by_host(cfg, WS_20_30);
 }
@@ -58,11 +97,13 @@ parameter:  cfg
 ******************************************************************************/
 void epd_init_gray(epd_config_t *cfg) {
     epd_reset(cfg);
-    sleep_ms(100);
+    epd_packet_t slp_pkt = {.type=PACKET_WAIT,.len=100};
+    epd_queue_push(cfg, &slp_pkt);
+    epd_flush_until_idle(cfg, 100000); //100ms timeout
 
-    epd_read_busy(cfg);
+    epd_queue_busy(cfg);
     epd_send_command(cfg, 0x12); // Soft-Reset
-    epd_read_busy(cfg);
+    epd_queue_busy(cfg);
 
     epd_send_command(cfg, 0x01); // Driver output control
     epd_send_data(cfg, 0x27);
@@ -78,7 +119,7 @@ void epd_init_gray(epd_config_t *cfg) {
     epd_send_data(cfg, 0x04);
 
     epd_set_cursor(cfg, 1,0);
-    epd_read_busy(cfg);
+    epd_queue_busy(cfg);
 
     epd_lut_by_host(cfg, Gray4);
 }
@@ -88,12 +129,8 @@ function :	Software reset
 parameter:  cfg
 ******************************************************************************/
 void epd_reset(epd_config_t *cfg) {
-    epd_digital_write(cfg->pin_rst, 1);
-    sleep_ms(10);
-    epd_digital_write(cfg->pin_rst, 0);
-    sleep_ms(2);
-    epd_digital_write(cfg->pin_rst, 1);
-    sleep_ms(10);
+    epd_packet_t pkt = {.type=PACKET_RESET};
+    epd_queue_push(cfg, &pkt);
 }
 
 /******************************************************************************
@@ -101,16 +138,20 @@ function :	Clear EPD-Buffer
 parameter:  cfg
 ******************************************************************************/
 void epd_clear(epd_config_t *cfg) {
-    uint16_t i;
+    static const uint8_t fill_ff[256]={
+        [0 ... 255]=0xFF
+    };
 
     epd_send_command(cfg, 0x24); //Write RAM for b/w (0,1)
-    for( i = 0; i < 4736; i++ ) {
-        epd_send_data(cfg, 0xFF);
+    for( uint16_t offset = 0; offset < 4736; offset += sizeof(fill_ff) ) {
+        uint32_t n = (4736 - offset) > sizeof(fill_ff) ? sizeof(fill_ff) : (4736 - offset);
+        epd_send_data_len(cfg, fill_ff, n);
     }
 
     epd_send_command(cfg, 0x26); //Write RAM for b/w (0,1)
-    for( i = 0; i < 4736; i++ ) {
-        epd_send_data(cfg, 0xFF);
+    for (uint16_t offset = 0; offset < 4736; offset += sizeof(fill_ff)) {
+        uint32_t n = (4736 - offset) > sizeof(fill_ff) ? sizeof(fill_ff) : (4736 - offset);
+        epd_send_data_len(cfg, fill_ff, n);
     }
     epd_refresh_full(cfg);
 }
@@ -119,13 +160,10 @@ void epd_clear(epd_config_t *cfg) {
 function :	Write the image-data to the EPD
 parameter:  the pointer to the image data
 ******************************************************************************/
-void epd_display(epd_config_t *cfg, uint8_t *image) {
+void epd_display(epd_config_t *cfg, const uint8_t *image) {
 	uint16_t i;	
 	epd_send_command(cfg, 0x24);   //write RAM for black(0)/white (1)
-	for ( i=0; i<4736; i++ )
-	{
-		epd_send_data(cfg, image[i]);
-	}
+    epd_send_data_len(cfg, image, 4736);
 	epd_refresh_full(cfg);
 }
 
@@ -133,20 +171,24 @@ void epd_display(epd_config_t *cfg, uint8_t *image) {
 function :	Write the image-data to the EPD
 parameter:  the pointer to the image data
 ******************************************************************************/
-void epd_display_base(epd_config_t *cfg, uint8_t *image) {
-    uint16_t i;
-
+void epd_display_base(epd_config_t *cfg, const uint8_t *image) {
 	epd_send_command(cfg, 0x24);   //Write Black and White image to RAM
-	for ( i=0; i<4736; i++ )
+    epd_send_data_len(cfg, image, 4736);
+	/*
+    for ( i=0; i<4736; i++ )
 	{               
 		epd_send_data(cfg, image[i]);
 	}
+    */
 
 	epd_send_command(cfg, 0x26);   //Write Black and White image to RAM
+    epd_send_data_len(cfg, image, 4736);
+    /*
 	for ( i=0; i<4736; i++ )
 	{               
 		epd_send_data(cfg, image[i]);
 	}
+    */
 	epd_refresh_full(cfg);
 }
 
@@ -156,100 +198,41 @@ function :	Write the image-data to the EPD in grayscale
             Don't touch, think about or even look at this function... I beg you
 parameter:  the pointer to the image data
 ******************************************************************************/
-void epd_display_gray(epd_config_t *cfg, uint8_t *image) {
-    uint32_t i,j,k;
-    uint8_t temp1,temp2,temp3;
+void epd_display_gray(epd_config_t *cfg, const uint8_t *image) {
+    // Tune chunk size: 256 output bytes → 512 input bytes; good balance for queue/service cadence
+    enum { OUT_CHUNK = 256 };
+    uint8_t staging[OUT_CHUNK];
 
-    // old  data
+    // --- Plane for 0x24: use LSB (plane_bit = 0), inverted as per original
     epd_send_command(cfg, 0x24);
-    for(i=0; i<4736; i++) { 
-        temp3=0;
-        for(j=0; j<2; j++) {
-            temp1 = image[i*2+j];
-            for(k=0; k<2; k++) {
-                temp2 = temp1&0xC0;
-                if(temp2 == 0xC0)
-                    temp3 |= 0x00;
-                else if(temp2 == 0x00)
-                    temp3 |= 0x01; 
-                else if(temp2 == 0x80)
-                    temp3 |= 0x01; 
-                else //0x40
-                    temp3 |= 0x00; 
-                temp3 <<= 1;
-
-                temp1 <<= 2;
-                temp2 = temp1&0xC0 ;
-                if(temp2 == 0xC0) 
-                    temp3 |= 0x00;
-                else if(temp2 == 0x00) 
-                    temp3 |= 0x01;
-                else if(temp2 == 0x80)
-                    temp3 |= 0x01; 
-                else    //0x40
-                    temp3 |= 0x00;	
-                if(j!=1 || k!=1)
-                    temp3 <<= 1;
-
-                temp1 <<= 2;
-            }
-        }
-        epd_send_data(cfg, temp3);
-        // printf("%x ",temp3);
+    for (uint32_t off = 0; off < EPD_1B; off += OUT_CHUNK) {
+        uint32_t n = (EPD_1B - off) > OUT_CHUNK ? OUT_CHUNK : (EPD_1B - off);
+        pack_2bpp_plane(image, off, staging, n, /*plane_bit=*/0);
+        epd_send_data_len(cfg, staging, n);
     }
 
-    epd_send_command(cfg, 0x26);   //write RAM for black(0)/white (1)
-    for(i=0; i<4736; i++) {            
-        temp3=0;
-        for(j=0; j<2; j++) {
-            temp1 = image[i*2+j];
-            for(k=0; k<2; k++) {
-                temp2 = temp1&0xC0 ;
-                if(temp2 == 0xC0)
-                    temp3 |= 0x00;//white
-                else if(temp2 == 0x00)
-                    temp3 |= 0x01;  //black
-                else if(temp2 == 0x80)
-                    temp3 |= 0x00;  //gray1
-                else //0x40
-                    temp3 |= 0x01; //gray2
-                temp3 <<= 1;
-
-                temp1 <<= 2;
-                temp2 = temp1&0xC0 ;
-                if(temp2 == 0xC0)  //white
-                    temp3 |= 0x00;
-                else if(temp2 == 0x00) //black
-                    temp3 |= 0x01;
-                else if(temp2 == 0x80)
-                    temp3 |= 0x00; //gray1
-                else    //0x40
-                    temp3 |= 0x01;	//gray2
-                if(j!=1 || k!=1)
-                    temp3 <<= 1;
-
-                temp1 <<= 2;
-            }
-        }
-        epd_send_data(cfg, temp3);
-        // printf("%x ",temp3);
+    // --- Plane for 0x26: use MSB (plane_bit = 1), inverted as per original
+    epd_send_command(cfg, 0x26);
+    for (uint32_t off = 0; off < EPD_1B; off += OUT_CHUNK) {
+        uint32_t n = (EPD_1B - off) > OUT_CHUNK ? OUT_CHUNK : (EPD_1B - off);
+        pack_2bpp_plane(image, off, staging, n, /*plane_bit=*/1);
+        epd_send_data_len(cfg, staging, n);
     }
 
-    epd_refresh_full(cfg);
+    epd_refresh_full(cfg); // enqueues 0x22/0x20 + WAIT_BUSY in your async path
 }
 
 /******************************************************************************
 function :	Write the image-data to the EPD in partial mode
 parameter:  cfg, image-data-pointer
 ******************************************************************************/
-void epd_display_partial(epd_config_t *cfg, uint8_t *image) {
+void epd_display_partial(epd_config_t *cfg, const uint8_t *image) {
     uint16_t i;
 
     //Reset
-    epd_digital_write(cfg->pin_rst, 0);
-    sleep_ms(2);
-    epd_digital_write(cfg->pin_rst, 1);
-    sleep_ms(2);
+    epd_reset(cfg); //TODO: Make sure this doesnt break
+    epd_packet_t slp_pkt = {.type=PACKET_WAIT,.len=2};
+    epd_queue_push(cfg, &slp_pkt);
 
     epd_lut(cfg, _WF_PARTIAL_2IN9);
     epd_send_command(cfg, 0x37);
@@ -270,15 +253,14 @@ void epd_display_partial(epd_config_t *cfg, uint8_t *image) {
     epd_send_command(cfg, 0x22);
     epd_send_data(cfg, 0xC0);
     epd_send_command(cfg, 0x20);
-    epd_read_busy(cfg);
+    epd_queue_busy(cfg);
 
     epd_set_partial(cfg, 0, 0, EPD_WIDTH-1, EPD_HEIGHT-1);
     epd_set_cursor(cfg, 0, 0);
 
     epd_send_command(cfg, 0x24); //Write Black and white Image to RAM
-    for(i - 0; i < 4736; i ++) {
-        epd_send_data(cfg, image[i]);
-    }
+
+    epd_send_data_len(cfg, image, 4736);
     epd_refresh_partial(cfg);
 }
 
@@ -289,7 +271,8 @@ parameter:  cfg
 void epd_sleep(epd_config_t *cfg) {
     epd_send_command(cfg, 0x10); //Enter Deep Sleep
     epd_send_data(cfg, 0x01);
-    sleep_ms(100);
+    epd_packet_t slp_pkt = {.type=PACKET_WAIT,.len=100};
+    epd_queue_push(cfg, &slp_pkt);
 }
 
 /******************************************************************************
@@ -300,7 +283,7 @@ void epd_refresh_full(epd_config_t *cfg) {
     epd_send_command(cfg, 0x22); //Display Update Control
 	epd_send_data(cfg, 0xc7);
 	epd_send_command(cfg, 0x20); //Activate Display Update Sequence
-	epd_read_busy(cfg);
+	epd_queue_busy(cfg);
 }
 
 /******************************************************************************
@@ -311,7 +294,7 @@ void epd_refresh_partial(epd_config_t *cfg) {
     epd_send_command(cfg, 0x22); //Display Update Control
 	epd_send_data(cfg, 0x0F);
 	epd_send_command(cfg, 0x20); //Activate Display Update Sequence
-	epd_read_busy(cfg);
+	epd_queue_busy(cfg);
 }
 
 /******************************************************************************
@@ -352,10 +335,8 @@ function :	send command
 parameter:  cfg, command-register
 ******************************************************************************/
 void epd_send_command(epd_config_t *cfg, uint8_t cmd) {
-    epd_digital_write(cfg->pin_dc, 0);
-    epd_digital_write(cfg->pin_cs, 0);
-    epd_spi_write(cfg, cmd);
-    epd_digital_write(cfg->pin_cs, 1);
+    epd_packet_t p = { .type=PACKET_CMD, .cmd=cmd };
+    epd_queue_push(cfg, &p);
 }
 
 /******************************************************************************
@@ -363,10 +344,17 @@ function :	send data
 parameter:  cfg, data
 ******************************************************************************/
 void epd_send_data(epd_config_t *cfg, uint8_t data) {
-    epd_digital_write(cfg->pin_dc, 1);
-    epd_digital_write(cfg->pin_cs, 0);
-    epd_spi_write(cfg, data);
-    epd_digital_write(cfg->pin_cs, 1);
+    epd_packet_t p = {.type=PACKET_DATA, .bytes=&data, .len=1, .pos=0};
+    epd_queue_push_copy_small(cfg, &p, &data, 1);
+}
+
+/******************************************************************************
+function :	send large data
+parameter:  cfg, data
+******************************************************************************/
+void epd_send_data_len(epd_config_t *cfg, const uint8_t *data, size_t len) {
+    epd_packet_t p = {.type=PACKET_DATA, .bytes=data, .len=len, .pos=0};
+    epd_queue_push(cfg, &p);
 }
 
 /******************************************************************************
@@ -385,12 +373,10 @@ function :	set EPD-LUT
 parameter:  cfg, LUT-ptr
 ******************************************************************************/
 void epd_lut(epd_config_t *cfg, uint8_t *lut) {
-    uint8_t count;
+    //uint8_t count;
     epd_send_command(cfg, 0x32);
-    for( count = 0; count < 153; count++ ) {
-        epd_send_data(cfg, lut[count]);
-    }
-    epd_read_busy(cfg);
+    epd_send_data_len(cfg, lut, 153);
+    epd_queue_busy(cfg);
 }
 
 /******************************************************************************
@@ -542,4 +528,55 @@ parameter:  cfg, data-ptr, len
 ******************************************************************************/
 void epd_spi_write_len(epd_config_t *cfg, uint8_t *data, uint32_t len) {
     spi_write_blocking(cfg->epd_port_spi, data, len);
+}
+
+void epd_service_async(epd_config_t *cfg, uint32_t time_budget_us) {
+    if (!cfg) return;
+    
+    const uint32_t CHUNK = 256;
+    epd_packet_t cur;
+    absolute_time_t t0 = get_absolute_time();
+
+    while ((uint32_t)absolute_time_diff_us(t0, get_absolute_time()) < time_budget_us) {
+        if (!epd_queue_peek(cfg, &cur)) return; // No packets left
+        // Switch type:
+        switch(cur.type) {
+            case PACKET_WAIT:
+                sleep_ms(cur.len);
+                epd_queue_pop(cfg, &cur);
+                break;
+            case PACKET_RESET:
+                epd_digital_write(cfg->pin_rst, 1);
+                sleep_ms(10);
+                epd_digital_write(cfg->pin_rst, 0);
+                sleep_ms(2);
+                epd_digital_write(cfg->pin_rst, 1);
+                sleep_ms(10);
+                break;
+            case PACKET_WAIT_BUSY:
+                if (epd_busy_low(cfg)) { 
+                    epd_queue_pop(cfg, &cur);  // Pop waiting packet off queue to free sending up
+                    continue;
+                }
+                return;                         // Try again next tick
+            case PACKET_CMD:
+                epd_digital_write(cfg->pin_dc, 0);
+                epd_digital_write(cfg->pin_cs, 0);
+                epd_spi_write(cfg, cur.cmd);
+                epd_digital_write(cfg->pin_cs, 1);
+                epd_queue_pop(cfg, &cur);  // Pop packet
+                break;
+            case PACKET_DATA:
+                uint32_t remain = cur.len - cur.pos;
+                if (!remain) { epd_queue_pop(cfg, &cur); continue; }
+                uint32_t n = (remain > CHUNK) ? CHUNK : remain;
+
+                epd_digital_write(cfg->pin_dc, 1);
+                epd_digital_write(cfg->pin_cs, 0);
+                epd_spi_write_len(cfg, cur.bytes + cur.pos, n);
+                epd_digital_write(cfg->pin_cs, 1);
+                epd_queue_advance_head(cfg, n);
+                break;                                              // Otherwise, leave packet on queue and just roll over to next iteration
+        }
+    }
 }
