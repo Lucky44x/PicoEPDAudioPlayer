@@ -10,17 +10,19 @@ returns:    The constructed Canvas-Config
 parameter:  
 ******************************************************************************/
 canvas_config_t canvas_build(uint8_t colorLevels, uint16_t rotation, uint8_t color) {
-    uint16_t canvasWidth = rotation == (CANVAS_ROTATE_0 || rotation == CANVAS_ROTATE_270) ? EPD_HEIGHT : EPD_WIDTH;
-    uint16_t canvasHeight = rotation == (CANVAS_ROTATE_0 || rotation == CANVAS_ROTATE_270) ? EPD_WIDTH : EPD_HEIGHT;
+    uint16_t canvasWidth = (rotation == CANVAS_ROTATE_0 || rotation == CANVAS_ROTATE_90) ? EPD_HEIGHT : EPD_WIDTH;
+    uint16_t canvasHeight = (rotation == CANVAS_ROTATE_0 || rotation == CANVAS_ROTATE_90) ? EPD_WIDTH : EPD_HEIGHT;
 
     canvas_config_t c = {
-        epd_spi0_default_config,                // Driver config
-        NULL,                                   // Framebuffer ptr - uninitialized, so NULL
-        canvasWidth, canvasHeight,              // Canvas Size
-        EPD_WIDTH, EPD_HEIGHT,                  // Memory Size
-        0,EPD_HEIGHT,                           // Width and Height Bytes
-        color, rotation, CANVAS_MIRROR_DFT,
-        0                                       // Scale
+        .driverConfig=epd_spi0_default_config,                // Driver config
+        .frameBuffer=NULL,                                   // Framebuffer ptr - uninitialized, so NULL
+        .width=canvasWidth, .height=canvasHeight,              // Canvas Size
+        .widthMem=EPD_WIDTH,.heightMem=EPD_HEIGHT,                  // Memory Size
+        .widthBytes=0,.heightBytes=EPD_HEIGHT,                           // Width and Height Bytes
+        .rotation=rotation, 
+        .color=color, 
+        .mirror=MIRROR_ORIGIN,
+        .colorscale=0                                       // Scale
     };
     canvas_set_colorscale(&c, colorLevels);
     return c;
@@ -131,14 +133,14 @@ void canvas_draw_point(canvas_config_t *cfg, uint16_t xPoint, uint16_t yPoint, u
 
     int16_t xDirNum, yDirNum;
     if ( fillStyle == DOT_FILL_AROUND ) {
-        for ( xDirNum = 0; yDirNum < 2 * pixelStyle - 1; xDirNum++ ) {
+        for ( xDirNum = 0; xDirNum < 2 * pixelStyle - 1; xDirNum++ ) {
             for ( yDirNum = 0; yDirNum < 2 * pixelStyle - 1; yDirNum++ ) {
                 if ( xPoint + xDirNum - pixelStyle < 0 || yPoint + yDirNum - pixelStyle < 0 ) break;
                 canvas_set_pixel(cfg, xPoint + xDirNum - pixelStyle, yPoint + yDirNum - pixelStyle, color);
             }
         }
     } else {
-        for ( xDirNum = 0; yDirNum < pixelStyle; xDirNum++ ) {
+        for ( xDirNum = 0; xDirNum < pixelStyle; xDirNum++ ) {
             for ( yDirNum = 0; yDirNum < pixelStyle; yDirNum++ ) {
                 canvas_set_pixel(cfg, xPoint + xDirNum - 1, yPoint + yDirNum - 1, color);
             }
@@ -408,6 +410,11 @@ parameter:  cfg
 void canvas_push_framebuffer(canvas_config_t *cfg) {
     if ( cfg->colorscale == 4 ) epd_display_gray(&cfg->driverConfig, cfg->frameBuffer);
     else epd_display(&cfg->driverConfig, cfg->frameBuffer);
+    printf("Scale: %u\n", cfg->colorscale);
+}
+
+void canvas_refresh_screen(canvas_config_t *cfg) {
+    canvas_push_framebuffer(cfg);
 }
 
 /******************************************************************************
@@ -415,7 +422,7 @@ function :	Sets the given pixel
 parameter:  cfg, x, y, color
 ******************************************************************************/
 void canvas_set_pixel(canvas_config_t *cfg, uint16_t xPoint, uint16_t yPoint, uint8_t color) {
-    if ( cfg->frameBuffer == NULL ) return;                     // Uninitialized
+    if ( cfg->frameBuffer == NULL ) { printf("Cannot write to frameBuffer NULL"); return; }                     // Uninitialized
     if ( xPoint > cfg->width || yPoint > cfg->height) return;   // Out of bounds
     uint16_t x,y;
     
@@ -452,6 +459,7 @@ void canvas_set_pixel(canvas_config_t *cfg, uint16_t xPoint, uint16_t yPoint, ui
             y = cfg->heightMem - y - 1;
             break;
         case MIRROR_NONE:
+            break;
         default:
             return;
     }
@@ -471,15 +479,7 @@ void canvas_set_pixel(canvas_config_t *cfg, uint16_t xPoint, uint16_t yPoint, ui
         uint32_t addr = x / 4 + y * cfg->widthBytes;
         color = color % 4; // color scale is 0..3
         uint8_t rData = cfg->frameBuffer[addr];
-        rData = rData & (~(0xC0 >> ((x % 4) / 2))); // Clear first, then set value
-        cfg->frameBuffer[addr] = rData | ((color << 6) >> ((x % 4) / 2));
-    }
-}
-
-void canvas_refresh_screen(canvas_config_t *cfg) {
-    if(cfg->colorscale == 4) {
-        epd_display_gray(&cfg->driverConfig, cfg->frameBuffer);
-    } else {
-        epd_display(&cfg->driverConfig, cfg->frameBuffer);
+        rData = rData & (~(0xC0 >> ((x % 4) * 2))); // Clear first, then set value
+        cfg->frameBuffer[addr] = rData | ((color << 6) >> ((x % 4) * 2));
     }
 }

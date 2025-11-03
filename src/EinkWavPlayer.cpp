@@ -39,7 +39,7 @@ int main()
 {
     int current_song = 0;
     stdio_init_all();
-    sleep_ms(5000); //Allow USB serial
+    sleep_ms(10000); //Allow USB serial
 
     printf("Launching File-System..\n");
     FRESULT fileManager_ok = fileManager.init();

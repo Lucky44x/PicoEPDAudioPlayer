@@ -3,7 +3,7 @@
 UIManager::UIManager() {}
 
 void UIManager::init() {
-    canvas_cfg = canvas_build(4, CANVAS_ROTATE_270, CANVAS_COLOR_GRAY_G1);
+    canvas_cfg = canvas_build(4, CANVAS_ROTATE_90, CANVAS_COLOR_GRAY_G4);
     canvas_init(&canvas_cfg);
 }
 
@@ -19,5 +19,5 @@ void UIManager::update() {
 
 void UIManager::redraw() {
     if (currentMenu != NULL) currentMenu->draw_menu(&canvas_cfg);
-    canvas_refresh_screen(&canvas_cfg);
+    printf("Is active: %u\n", currentMenu != NULL);
 }
