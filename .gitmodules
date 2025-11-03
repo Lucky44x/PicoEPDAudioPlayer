@@ -1,0 +1,6 @@
+[submodule "libs/pico_fatfs"]
+	path = libs/pico_fatfs
+	url = https://github.com/elehobica/pico_fatfs.git
+[submodule "libs/dr_libs"]
+	path = libs/dr_libs
+	url = https://github.com/mackron/dr_libs.git
