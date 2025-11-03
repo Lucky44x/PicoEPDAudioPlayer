@@ -47,6 +47,7 @@ class FileManager {
         FRESULT read_image_index(uint32_t index, uint8_t *out);
 
         uint32_t read_song_count();
+        uint32_t read_album_count();
 
         FRESULT open_song_file(uint32_t index);
         void close_song_file();

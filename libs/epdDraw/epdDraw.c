@@ -31,12 +31,12 @@ function :	Initializes the Canvas and EPD Driver
 parameter:  cfg
 ******************************************************************************/
 void canvas_init(canvas_config_t *cfg) {
-    if ( epd_driver_init(&cfg->driverConfig) != 0) {
+    if (epd_driver_init(&cfg->driverConfig) != 0) {
         panic("Could not intialize Driver for EPD-Draw Canvas");
         return;
     }  
 
-    if ( cfg->colorscale == 4 ) epd_gray_init(&cfg->driverConfig);
+    if ( cfg->colorscale == 4 ) epd_init_gray(&cfg->driverConfig);
     else epd_init(&cfg->driverConfig);
     epd_clear(&cfg->driverConfig);
 
@@ -83,7 +83,7 @@ void canvas_set_rotation(canvas_config_t *cfg, uint16_t rotation) { cfg->rotatio
 function :	Sets the canvas's mirroring
 parameter:  cfg, mirror
 ******************************************************************************/
-void canvas_set_mirro(canvas_config_t *cfg, uint8_t mirror) { cfg->mirror = mirror; }
+void canvas_set_mirror(canvas_config_t *cfg, uint8_t mirror) { cfg->mirror = mirror; }
 
 /******************************************************************************
 function :	Clears the canvas
@@ -473,5 +473,13 @@ void canvas_set_pixel(canvas_config_t *cfg, uint16_t xPoint, uint16_t yPoint, ui
         uint8_t rData = cfg->frameBuffer[addr];
         rData = rData & (~(0xC0 >> ((x % 4) / 2))); // Clear first, then set value
         cfg->frameBuffer[addr] = rData | ((color << 6) >> ((x % 4) / 2));
+    }
+}
+
+void canvas_refresh_screen(canvas_config_t *cfg) {
+    if(cfg->colorscale == 4) {
+        epd_display_gray(&cfg->driverConfig, cfg->frameBuffer);
+    } else {
+        epd_display(&cfg->driverConfig, cfg->frameBuffer);
     }
 }

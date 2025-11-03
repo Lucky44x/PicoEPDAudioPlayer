@@ -43,6 +43,7 @@ add_executable(EinkWavPlayer
     src/EinkWavPlayer.cpp
     src/UIMenus.cpp
     src/AudioCore.cpp
+    src/UIManager.cpp
 )
 
 pico_set_program_name(EinkWavPlayer "EinkWavPlayer")

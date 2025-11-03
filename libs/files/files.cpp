@@ -189,6 +189,20 @@ uint32_t FileManager::read_song_count() {
     return song_count;
 }
 
+uint32_t FileManager::read_album_count() {
+    FIL f;
+    if (f_open(&f, "/albums.db", FA_READ) != FR_OK) return 0;
+
+    uint8_t hdr[53];
+    UINT br;
+    if (f_read(&f, hdr, 53, &br) != FR_OK || br != 53) { f_close(&f); return 0; }
+
+    uint32_t first_offset = hdr[47] | (hdr[48]<<8) | (hdr[49]<<16);
+    f_close(&f);
+
+    return first_offset / 53;   // exact album count
+}
+
 FRESULT FileManager::read_artist_index(uint32_t index, artist_record_t* out) {
     if (!out) return FR_INT_ERR;
 

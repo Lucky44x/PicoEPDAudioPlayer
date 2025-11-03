@@ -24,7 +24,7 @@ static epd_config_t epd_spi0_default_config = {
 
 epd_config_t epd_build(int rst, int dc, int cs, int busy, int clk, int mosi, spi_inst_t *port);
 void epd_init(epd_config_t *cfg);
-void epd_gray_init(epd_config_t *cfg);
+void epd_init_gray(epd_config_t *cfg);
 void epd_clear(epd_config_t *cfg);
 void epd_display(epd_config_t *cfg, uint8_t *image_data);
 void epd_display_base(epd_config_t *cfg, uint8_t *image_data);

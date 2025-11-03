@@ -46,6 +46,7 @@
         "stdlib.h": "c",
         "epddraw-impl.h": "c",
         "epddraw.h": "c",
-        "functional": "c"
+        "functional": "c",
+        "epd2in9.h": "c"
     }
 }

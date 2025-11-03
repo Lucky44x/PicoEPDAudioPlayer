@@ -4,10 +4,13 @@
 
 #include "files.h"
 #include "AudioCore.h"
+#include "UIMenus.h"
 
 audio_player_handle_t g_player;
-AudioCore g_core;
 FileManager fileManager;
+AudioCore g_core(&g_player, &fileManager);
+UIManager uiManager;
+MainMenu mainMenuUI(&uiManager, &fileManager);
 
 void core1_entry() {
     audio_player_config_t cfg = {
@@ -35,12 +38,10 @@ void core1_entry() {
 int main()
 {
     int current_song = 0;
-
     stdio_init_all();
     sleep_ms(5000); //Allow USB serial
 
     printf("Launching File-System..\n");
-    fileManager = FileManager();
     FRESULT fileManager_ok = fileManager.init();
 
     if (fileManager_ok != FR_OK) {
@@ -48,24 +49,46 @@ int main()
         return 1;
     }
 
-    printf("Starting Audio Test\n");
+    //Launch EPD
+    printf("Launching EPD-Driver\n");
+    uiManager.init();
+    sleep_ms(100);
+    uiManager.switch_menu(&mainMenuUI);
+    uiManager.redraw();
 
     // Launch DAC-Thread
+    printf("Launching Audio on Core-1\n");
     multicore_launch_core1(core1_entry);
-
+    
     uint32_t token = multicore_fifo_pop_blocking();
     if(token != 0xA11D0) {
-        printf("Core1 init failed");
+        printf("Core1 init failed\n");
         while(true) sleep_ms(100);
     }
-    printf("Core1 ready... Launching Audio-Core");
-    g_core = AudioCore(&g_player, &fileManager);
+    printf("Core1 ready... Launching Audio-Core\n");
 
     if (!g_core.open()) {
-        printf("Audio core could not start");
+        printf("Audio core could not start\n");
         while(true) sleep_ms(100);
     }
 
+    if (!g_core.start_song(0)) {
+        printf("Could not open song 0 from disk");
+        while(true) sleep_ms(100);
+    }
+
+    while (true) {
+        if (g_core.awaitingNext()) { 
+            g_core.mute(true);
+            if (!g_core.start_song(++current_song)) break;
+            g_core.mute(false);
+        }
+
+        g_core.pump();
+        //printf("test");
+        sleep_ms(1);
+    }
+    /*
     if (!g_core.start_song(0)) {
         printf("Could not open song 0 from disk");
         while(true) sleep_ms(100);
@@ -84,4 +107,5 @@ int main()
         //printf("test");
         sleep_ms(1);
     }
+    */
 }
