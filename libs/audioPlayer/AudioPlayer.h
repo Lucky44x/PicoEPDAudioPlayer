@@ -34,6 +34,8 @@ audio_buffer_pool_t* audio_player_get_producer(audio_player_handle_t *h);
 bool audio_player_start(audio_player_handle_t *h);
 void audio_player_stop(audio_player_handle_t *h);
 
+void audio_player_mute(bool muted);
+
 // Helpers
 audio_buffer_t* audio_player_take_buffer(audio_player_handle_t *h, bool block);
 void audio_player_queue_buffer(audio_player_handle_t *h, audio_buffer_t *buf);

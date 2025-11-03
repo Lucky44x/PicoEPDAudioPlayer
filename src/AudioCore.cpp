@@ -4,7 +4,7 @@
 
 AudioCore::AudioCore() {}
 
-bool AudioCore::open_song(uint32_t song_index) {
+bool AudioCore::start_song(uint32_t song_index) {
     if (!m_player || !audio_player_get_producer(m_player)) return false;
 
     FRESULT file_result = m_fm->open_song_file(song_index);
@@ -12,24 +12,38 @@ bool AudioCore::open_song(uint32_t song_index) {
 
     drwav_bool32 wav_ok = drwav_init(&m_wav, wav_read, wav_seek, wav_tell, &(m_fm->current_song_file), NULL);
     if (!wav_ok) return false;
-    return true;
-}
-
-bool AudioCore::start() {
-    if (!m_player || !audio_player_get_producer(m_player)) return false;
-    if (!audio_player_start(m_player)) return false;
+    m_eof = false;
     m_running = true;
     return true;
 }
 
-void AudioCore::stop() {
-    if (!m_player) return;
+bool AudioCore::open() {
+    if (!m_player || !audio_player_get_producer(m_player)) return false;
+    if (!audio_player_start(m_player)) return false;
+    m_running = false;
+    m_eof = false;
+    return true;
+}
+
+void AudioCore::close() {
+    stop();
     audio_player_stop(m_player);
     m_running = false;
 }
 
+void AudioCore::stop() {
+    if (!m_player) return;
+    drwav_uninit(&m_wav);
+    m_fm->close_song_file();
+}
+
+void AudioCore::mute(bool muted) {
+    if(!m_player) return;
+    audio_player_mute(muted);
+}
+
 void AudioCore::pump() {
-    if (!m_running || !m_player) return;
+    if (!m_running || !m_player || m_eof) return;
 
     for (;;) {
         audio_buffer_t *b = audio_player_take_buffer(m_player, false);
@@ -54,6 +68,7 @@ void AudioCore::pump() {
 
         if (frames_read == 0) {
             //EOF
+            m_eof = true;
             break;
         }
 
@@ -61,7 +76,10 @@ void AudioCore::pump() {
         audio_player_queue_buffer(m_player, b);
         if (frames_read < want_frames) {
             //EOF
+            m_eof = true;
             break;
         }
     }
+
+    if (m_eof) stop();
 }
