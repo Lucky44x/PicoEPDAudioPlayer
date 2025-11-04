@@ -2,6 +2,7 @@
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
 
+#include "input.h"
 #include "files.h"
 #include "AudioCore.h"
 #include "UIMenus.h"
@@ -10,6 +11,7 @@ audio_player_handle_t g_player;
 FileManager fileManager;
 AudioCore g_core(&g_player, &fileManager);
 UIManager uiManager;
+InputManager inputManager;
 
 //Menus
 ErrorMenu errorMenu(&uiManager, &fileManager);
@@ -28,7 +30,7 @@ void core1_entry() {
     };
 
     if (!audio_player_init(&g_player, &cfg)) {
-        printf("AudioPlayer inti failed\n");
+        printf("AudioPlayer init failed\n");
         multicore_fifo_push_blocking(0xBAD); // signal failure
         while (true) sleep_ms(100);
     }
@@ -49,12 +51,31 @@ int main()
     uiManager.init();
     sleep_ms(100);
 
+    printf("Launching Input-Manager\n");
+    inputManager.init(8000);
+    bool input_ok = true;
+
+    //if (!inputManager.register_button_pin(17,BUTTON_PREV) input_ok = false; TODO: 17 is double soldered, move connection to 26 instead
+    if (!inputManager.register_button_pin(9, BUTTON_PLAY)) input_ok = false;
+    if (!inputManager.register_button_pin(22, BUTTON_NEXT)) input_ok = false;
+    //if (!inputManager.register_button_pin(16,BUTTON_UP)) input_ok = false; TODO: 16 is double soldered, move connection to other port
+    if (!inputManager.register_button_pin(15, BUTTON_SELECT)) input_ok = false;
+    if (!inputManager.register_button_pin(14, BUTTON_DOWN)) input_ok = false;
+
+    if (!input_ok) {
+        printf("Failed to initialize Input-Manager\n");
+        errorMenu.set_message_utf8("Input init failed");
+        uiManager.switch_menu(&errorMenu);
+        uiManager.redraw();
+        return 1;
+    }
+
     printf("Launching File-System..\n");
     FRESULT fileManager_ok = fileManager.init();
 
     if (fileManager_ok != FR_OK) {
         printf("Failed to initialize File-Manager %u", fileManager_ok);
-        errorMenu.set_message_utf8("No SD-Card found !");
+        errorMenu.set_message_utf8("No SD-Card found");
         uiManager.switch_menu(&errorMenu);
         uiManager.redraw();
         return 1;
@@ -75,7 +96,9 @@ int main()
     printf("Core1 ready... Launching Audio-Core\n");
 
     // If everything is fine, load main-menu selection
-    uiManager.switch_menu(&mainMenuUI);
+    errorMenu.set_fallback(&mainMenuUI);
+    errorMenu.set_message_utf8("TEST");
+    uiManager.switch_menu(&errorMenu);
     uiManager.redraw();
 
     if (!g_core.open()) {
@@ -85,20 +108,35 @@ int main()
         uiManager.redraw();
         return 1;
     }
+    g_core.mute(true);
 
+    /*
     if (!g_core.start_song(0)) {
         printf("Could not open song 0 from disk");
         while(true) sleep_ms(100);
     }
+    */
 
     while (true) {
+
+        // Input stuff
+        InputEvent ev;
+        if (inputManager.poll_event(ev)) {
+            uiManager.input(ev);
+            printf("Input Event: %u, %u\n", ev.code, ev.type);
+        }
+
+        /*
+        // Audio stuff
         if (g_core.awaitingNext()) { 
             g_core.mute(true);
-            if (!g_core.start_song(++current_song)) break;
+            current_song ++;
+            if (!g_core.start_song(current_song)) break;
             g_core.mute(false);
         }
 
         g_core.pump();
+        */
     }
     /*
     if (!g_core.start_song(0)) {

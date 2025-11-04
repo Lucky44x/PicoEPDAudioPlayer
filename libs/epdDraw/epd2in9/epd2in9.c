@@ -309,7 +309,7 @@ parameter:  cfg
 ******************************************************************************/
 void epd_refresh_partial(epd_config_t *cfg) {
     epd_send_command(cfg, 0x22); //Display Update Control
-	epd_send_data(cfg, 0xCF);
+	epd_send_data(cfg, 0x0F);
 	epd_send_command(cfg, 0x20); //Activate Display Update Sequence
 	epd_read_busy(cfg);
 }
@@ -568,7 +568,7 @@ void epd_send_partial(epd_config_t *cfg, const uint8_t *buffer, uint16_t byteWid
     uint8_t byte_end_x = (xe >> 3);      //Divide by 8
     uint16_t line_bytes = (uint16_t)(byte_end_x - byte_start_x + 1);    //How many bytes per row
 
-    printf("Data: start: %u, end: %u, per_line: %u", byte_start_x, byte_end_x, line_bytes);
+    //printf("Data: start: %u, end: %u, per_line: %u", byte_start_x, byte_end_x, line_bytes);
 
     for (uint16_t y = y0; y <= y1; y++) {
         epd_set_cursor(cfg, byte_start_x, y);
@@ -589,6 +589,8 @@ void epd_send_partial(epd_config_t *cfg, const uint8_t *buffer, uint16_t byteWid
     */
 
     epd_refresh_partial(cfg);
+    //epd_refresh_partial(cfg);
+    //epd_refresh_partial(cfg);
 }
 
 /******************************************************************************

@@ -25,7 +25,7 @@ static void print_utf16le(const uint16_t *name, size_t codepoints) {
     putchar('\n');
 }
 
-#pragma region No Filesystem
+#pragma region Error
 ErrorMenu::ErrorMenu(UIManager *parent, FileManager *fm) : UIMenu(parent), m_fm(fm) {}
 
 void ErrorMenu::start_menu() {
@@ -86,10 +86,12 @@ void ErrorMenu::update_menu() {
 
 }
 
-void ErrorMenu::button_input(uint8_t buttonCode) {
-    if (buttonCode != 0 && m_fallback != nullptr) {
+void ErrorMenu::button_input(InputEvent &e) {
+    if (e.code != 0 && m_fallback != nullptr) {
         //Switch to fallback menu
         parentManager->switch_menu(m_fallback);
+        parentManager->redraw();
+        m_fallback = nullptr;
     }
 }
 
@@ -107,6 +109,7 @@ void MainMenu::start_menu() {
 }
 
 void MainMenu::draw_menu(canvas_config_t *canvas) {
+    cached_canvas = canvas;
     canvas_set_colorscale(canvas, 2);
     canvas_update_color_depth(canvas);
 
@@ -136,18 +139,39 @@ void MainMenu::draw_menu(canvas_config_t *canvas) {
 
     //Set epd to partial mode
     canvas_init_partial(canvas);
-    //canvas_draw_rect(canvas, 0, 0, 16, 127, CANVAS_COLOR_BW_BLACK, DOT_SIZE_1X1, DRAW_FILL_FULL);
-    canvas_draw_circle(canvas, 8, 20, 4, CANVAS_COLOR_BW_BLACK, DOT_SIZE_1X1, DRAW_FILL_FULL);
+    canvas_draw_rect(canvas, 4, 20 + (selected_index * 16), 12, 32 + (selected_index * 16), CANVAS_COLOR_BW_BLACK, DOT_SIZE_1X1, DRAW_FILL_FULL);
     canvas_refresh_partial(canvas, 0, 0, 16, 127);
-    //canvas_refresh_screen(canvas);
+
+    epd_init(&canvas->driverConfig);
+
+    updates = 0;
 }
 
 void MainMenu::update_menu() {
 
 }
 
-void MainMenu::button_input(uint8_t buttonCode) {
+void MainMenu::button_input(InputEvent &e) {
+    if (e.type == InputManager::EVENT_RELEASE) return;
 
+    // UI stuff
+    if (e.code == BUTTON_DOWN) selected_index += 1;
+
+    printf("Incremented index: %u", selected_index);
+
+    if (cached_canvas == nullptr) return;
+    canvas_clear_partial(cached_canvas, 0, 0, 16, 127, CANVAS_COLOR_BW_WHITE);
+    canvas_draw_rect(cached_canvas, 4, 20 + (selected_index * 16), 12, 32 + (selected_index * 16), CANVAS_COLOR_BW_BLACK, DOT_SIZE_1X1, DRAW_FILL_FULL);
+    
+    if (updates >= 4) {
+        draw_menu(cached_canvas);
+    } else {
+        //canvas_init_partial(cached_canvas);
+        //canvas_refresh_partial(cached_canvas, 0, 0, 16, 127);
+        canvas_refresh_screen(cached_canvas);
+        updates++;
+    }
+    printf("Finished input consume");
 }
 
 void MainMenu::close_menu() {

@@ -5,10 +5,18 @@
 #include "stdio.h"
 #include <memory.h>
 #include "files.h"
+#include "input.h"
 
 extern "C" {
 #include "epdDraw.h"
 }
+
+#define BUTTON_PREV 1
+#define BUTTON_PLAY 2
+#define BUTTON_NEXT 3
+#define BUTTON_UP 4
+#define BUTTON_SELECT 5
+#define BUTTON_DOWN 6
 
 static size_t utf8_to_16arr(const char* utf8, uint16_t* out, size_t max_len) {
     size_t count = 0;
@@ -63,7 +71,6 @@ static void print_hex(const char* label, const uint8_t* data, size_t len) {
     printf("\n");
 }
 
-
 class UIMenu;
 class UIManager;
 
@@ -71,6 +78,7 @@ class UIManager {
     public:
        UIManager();
         void switch_menu(UIMenu *newMenu);
+        void input(InputEvent &event);
         void update();
         void redraw();
         void init();
@@ -85,7 +93,7 @@ class UIMenu {
         virtual ~UIMenu() = default;
 
         virtual void start_menu() = 0;
-        virtual void button_input(uint8_t buttonCode) = 0;
+        virtual void button_input(InputEvent &e) = 0;
         virtual void draw_menu(canvas_config_t *canvas) = 0;
         virtual void update_menu() = 0;
         virtual void close_menu() = 0;
@@ -105,7 +113,7 @@ class ErrorMenu : public UIMenu {
 
         void start_menu() override;
         void update_menu() override;
-        void button_input(uint8_t buttonCode) override;
+        void button_input(InputEvent &e) override;
         void draw_menu(canvas_config_t *canvas) override;
         void close_menu() override;
     private:
@@ -121,12 +129,14 @@ class MainMenu : public UIMenu {
         explicit MainMenu(UIManager *parent, FileManager *fm);
         void start_menu() override;
         void update_menu() override;
-        void button_input(uint8_t buttonCode) override;
+        void button_input(InputEvent &e) override;
         void draw_menu(canvas_config_t *canvas) override;
         void close_menu() override;
     private:
         FileManager *fm;
         uint selected_index = 0;
+        uint updates = 0;
+        canvas_config_t *cached_canvas;
 };
 
 class SongMenu : public UIMenu {
@@ -134,7 +144,7 @@ class SongMenu : public UIMenu {
         explicit SongMenu(UIManager *parent, uint16_t albumID);
 
         void start_menu() override;
-        void button_input(uint8_t buttonCode) override;
+        void button_input(InputEvent &e) override;
         void draw_menu(canvas_config_t *canvas) override;
     private:
         uint16_t albumID;
@@ -142,9 +152,12 @@ class SongMenu : public UIMenu {
 
 class Playback : public UIMenu {
     public:
-        explicit Playback(UIManager& parent);
+        explicit Playback(UIManager *parent, FileManager *fm);
         void start_menu() override;
-        void button_input(uint8_t buttonCode) override;
+        void button_input(InputEvent &e) override;
+    private:
+        song_record_t *song;
+        FileManager *fm;
 };
 
 #endif

@@ -59,6 +59,7 @@ add_subdirectory(libs/epdDraw/)
 add_subdirectory(libs/audioPlayer/)
 add_subdirectory(libs/files/)
 add_subdirectory(libs/dr_impl/)
+add_subdirectory(libs/input/)
 
 # Add the standard library to the build
 target_link_libraries(EinkWavPlayer pico_stdlib)
@@ -74,6 +75,7 @@ target_link_libraries(EinkWavPlayer
     audioPlayer
     files
     dr_impl
+    input
 )
 
 pico_add_extra_outputs(EinkWavPlayer)
