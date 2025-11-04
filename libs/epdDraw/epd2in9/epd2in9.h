@@ -39,4 +39,7 @@ void epd_refresh_partial(epd_config_t *cfg);
 void epd_set_partial(epd_config_t *cfg, uint16_t xStart, uint16_t yStart, uint16_t xEnd, uint16_t yEnd);
 void epd_set_cursor(epd_config_t *cfg, uint16_t xStart, uint16_t yStart);
 
+void epd_send_partial(epd_config_t *cfg, const uint8_t *buffer, uint16_t fb_width_bytes, uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1);
+void epd_prepare_partial(epd_config_t *cfg);
+
 #endif //EPD_2IN9_H

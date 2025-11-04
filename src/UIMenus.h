@@ -81,7 +81,7 @@ class UIManager {
 
 class UIMenu {
     public:
-        explicit UIMenu(UIManager *parent, FileManager *fm) : parentManager(parent), fm(fm) {}
+        explicit UIMenu(UIManager *parent) : parentManager(parent) {}
         virtual ~UIMenu() = default;
 
         virtual void start_menu() = 0;
@@ -90,8 +90,30 @@ class UIMenu {
         virtual void update_menu() = 0;
         virtual void close_menu() = 0;
     protected:
-        FileManager *fm;
         UIManager *parentManager;
+};
+
+class ErrorMenu : public UIMenu {
+    public:
+        explicit ErrorMenu(UIManager *parent, FileManager *fm);
+
+        //Setting
+        void set_message_utf8(const char* msg_utf8);
+        void set_message_cp(const uint16_t* msg_cp, size_t len);
+
+        void set_fallback(UIMenu *fallback) { m_fallback = fallback; }
+
+        void start_menu() override;
+        void update_menu() override;
+        void button_input(uint8_t buttonCode) override;
+        void draw_menu(canvas_config_t *canvas) override;
+        void close_menu() override;
+    private:
+        static constexpr size_t kMaxMsg = 64;
+        uint16_t m_message[kMaxMsg] = {0};
+        size_t m_msgLen = 0;
+        UIMenu *m_fallback = nullptr;
+        FileManager *m_fm;
 };
 
 class MainMenu : public UIMenu {
@@ -103,6 +125,7 @@ class MainMenu : public UIMenu {
         void draw_menu(canvas_config_t *canvas) override;
         void close_menu() override;
     private:
+        FileManager *fm;
         uint selected_index = 0;
 };
 

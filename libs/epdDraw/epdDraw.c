@@ -4,14 +4,49 @@
 extern const uint8_t _binary_fonts_unifont_bin_start[];
 extern const uint8_t _binary_fonts_unifont_bin_end[];
 
+static inline void canvas_point_to_panel(const canvas_config_t *cfg, uint16_t sx, uint16_t sy, uint16_t *px, uint16_t *py)
+{
+    uint16_t x = sx, y = sy;
+
+    switch (cfg->rotation) {
+        case CANVAS_ROTATE_0:
+            break;
+        case CANVAS_ROTATE_90:
+            x = (uint16_t)(cfg->widthMem  - 1 - sy);
+            y = sx;
+            break;
+        case CANVAS_ROTATE_180:
+            x = (uint16_t)(cfg->widthMem  - 1 - sx);
+            y = (uint16_t)(cfg->heightMem - 1 - sy);
+            break;
+        case CANVAS_ROTATE_270:
+            x = sy;
+            y = (uint16_t)(cfg->heightMem - 1 - sx);
+            break;
+    }
+
+    switch (cfg->mirror) {
+        case MIRROR_HORIZONTAL: x = (uint16_t)(cfg->widthMem  - 1 - x); break;
+        case MIRROR_VERTICAL:   y = (uint16_t)(cfg->heightMem - 1 - y); break;
+        case MIRROR_ORIGIN:
+            x = (uint16_t)(cfg->widthMem  - 1 - x);
+            y = (uint16_t)(cfg->heightMem - 1 - y);
+            break;
+        default: break;
+    }
+
+    *px = x;
+    *py = y;
+}
+
 /******************************************************************************
 function :	Build config for Canvas
 returns:    The constructed Canvas-Config
 parameter:  
 ******************************************************************************/
 canvas_config_t canvas_build(uint8_t colorLevels, uint16_t rotation, uint8_t color) {
-    uint16_t canvasWidth = (rotation == CANVAS_ROTATE_0 || rotation == CANVAS_ROTATE_90) ? EPD_HEIGHT : EPD_WIDTH;
-    uint16_t canvasHeight = (rotation == CANVAS_ROTATE_0 || rotation == CANVAS_ROTATE_90) ? EPD_WIDTH : EPD_HEIGHT;
+    uint16_t canvasWidth = (rotation == CANVAS_ROTATE_270 || rotation == CANVAS_ROTATE_90) ? EPD_HEIGHT : EPD_WIDTH;
+    uint16_t canvasHeight = (rotation == CANVAS_ROTATE_270 || rotation == CANVAS_ROTATE_90) ? EPD_WIDTH : EPD_HEIGHT;
 
     canvas_config_t c = {
         .driverConfig=epd_spi0_default_config,                // Driver config
@@ -40,7 +75,7 @@ void canvas_init(canvas_config_t *cfg) {
 
     if ( cfg->colorscale == 4 ) epd_init_gray(&cfg->driverConfig);
     else epd_init(&cfg->driverConfig);
-    epd_clear(&cfg->driverConfig);
+    //epd_clear(&cfg->driverConfig);
 
     // Allocate Frame-Buffer
     uint8_t *frameBuffer;
@@ -51,6 +86,18 @@ void canvas_init(canvas_config_t *cfg) {
     }
 
     cfg->frameBuffer = frameBuffer;
+}
+
+/******************************************************************************
+function :  Reinitializes the EPD-Driver based on changed color-depth
+parameter:  cfg
+******************************************************************************/
+void canvas_update_color_depth(canvas_config_t *cfg) {
+    canvas_clear(cfg, cfg->colorscale==4 ? CANVAS_COLOR_GRAY_G4 : CANVAS_COLOR_BW_WHITE);
+
+    if ( cfg->colorscale == 4 ) epd_init_gray(&cfg->driverConfig);
+    else epd_init(&cfg->driverConfig);
+    //epd_clear(&cfg->driverConfig);
 }
 
 /******************************************************************************
@@ -129,7 +176,7 @@ function :	Draws a point at the given position
 parameter:  cfg, xPoint, yPoint, color, dotSize, dotStyle
 ******************************************************************************/
 void canvas_draw_point(canvas_config_t *cfg, uint16_t xPoint, uint16_t yPoint, uint8_t color, CANVAS_DOT_SIZE pixelStyle, CANVAS_DOT_STYLE fillStyle) {
-    if ( xPoint > cfg->width || yPoint > cfg->height ) return;
+    if ( xPoint >= cfg->width || yPoint >= cfg->height ) return;
 
     int16_t xDirNum, yDirNum;
     if ( fillStyle == DOT_FILL_AROUND ) {
@@ -418,12 +465,39 @@ void canvas_refresh_screen(canvas_config_t *cfg) {
 }
 
 /******************************************************************************
+function :	initializes the partial mode for the epd
+parameter:  cfg
+******************************************************************************/
+void canvas_init_partial(canvas_config_t *cfg) {
+    epd_prepare_partial(&cfg->driverConfig);
+}
+
+/******************************************************************************
+function :	Pushes the provided portion of the frameBuffer to the screen
+parameter:  cfg
+******************************************************************************/
+void canvas_refresh_partial(canvas_config_t *cfg, uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1) {
+    // Transform both corners to panel-space
+    uint16_t px0, py0, px1, py1;
+    canvas_point_to_panel(cfg, x0, y0, &px0, &py0);
+    canvas_point_to_panel(cfg, x1, y1, &px1, &py1);
+    
+    if (px0 > px1) { uint16_t t = px0; px0 = px1; px1 = t; }
+    if (py0 > py1) { uint16_t t = py0; py0 = py1; py1 = t; }
+
+    if (px1 >= cfg->widthMem) px1 = cfg->widthMem - 1;
+    if (py1 >= cfg->heightMem) py1 = cfg->heightMem - 1;
+
+    epd_send_partial(&cfg->driverConfig, cfg->frameBuffer, cfg->widthBytes, px0, py0, px1, py1);
+}
+
+/******************************************************************************
 function :	Sets the given pixel
 parameter:  cfg, x, y, color
 ******************************************************************************/
 void canvas_set_pixel(canvas_config_t *cfg, uint16_t xPoint, uint16_t yPoint, uint8_t color) {
     if ( cfg->frameBuffer == NULL ) { printf("Cannot write to frameBuffer NULL"); return; }                     // Uninitialized
-    if ( xPoint > cfg->width || yPoint > cfg->height) return;   // Out of bounds
+    if ( xPoint >= cfg->width || yPoint >= cfg->height) return;   // Out of bounds
     uint16_t x,y;
     
     switch ( cfg->rotation )

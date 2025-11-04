@@ -10,6 +10,9 @@ audio_player_handle_t g_player;
 FileManager fileManager;
 AudioCore g_core(&g_player, &fileManager);
 UIManager uiManager;
+
+//Menus
+ErrorMenu errorMenu(&uiManager, &fileManager);
 MainMenu mainMenuUI(&uiManager, &fileManager);
 
 void core1_entry() {
@@ -41,20 +44,21 @@ int main()
     stdio_init_all();
     sleep_ms(10000); //Allow USB serial
 
+    //Launch EPD
+    printf("Launching EPD-Driver\n");
+    uiManager.init();
+    sleep_ms(100);
+
     printf("Launching File-System..\n");
     FRESULT fileManager_ok = fileManager.init();
 
     if (fileManager_ok != FR_OK) {
         printf("Failed to initialize File-Manager %u", fileManager_ok);
+        errorMenu.set_message_utf8("No SD-Card found !");
+        uiManager.switch_menu(&errorMenu);
+        uiManager.redraw();
         return 1;
     }
-
-    //Launch EPD
-    printf("Launching EPD-Driver\n");
-    uiManager.init();
-    sleep_ms(100);
-    uiManager.switch_menu(&mainMenuUI);
-    uiManager.redraw();
 
     // Launch DAC-Thread
     printf("Launching Audio on Core-1\n");
@@ -63,13 +67,23 @@ int main()
     uint32_t token = multicore_fifo_pop_blocking();
     if(token != 0xA11D0) {
         printf("Core1 init failed\n");
-        while(true) sleep_ms(100);
+        errorMenu.set_message_utf8("Core-1 failed...");
+        uiManager.switch_menu(&errorMenu);
+        uiManager.redraw();
+        return 1;
     }
     printf("Core1 ready... Launching Audio-Core\n");
 
+    // If everything is fine, load main-menu selection
+    uiManager.switch_menu(&mainMenuUI);
+    uiManager.redraw();
+
     if (!g_core.open()) {
         printf("Audio core could not start\n");
-        while(true) sleep_ms(100);
+        errorMenu.set_message_utf8("Audio failed...");
+        uiManager.switch_menu(&errorMenu);
+        uiManager.redraw();
+        return 1;
     }
 
     if (!g_core.start_song(0)) {
@@ -85,8 +99,6 @@ int main()
         }
 
         g_core.pump();
-        //printf("test");
-        sleep_ms(1);
     }
     /*
     if (!g_core.start_song(0)) {

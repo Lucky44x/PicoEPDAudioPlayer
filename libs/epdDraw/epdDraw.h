@@ -73,6 +73,7 @@ typedef struct {
 canvas_config_t canvas_build(uint8_t colorLevels, uint16_t rotation, uint8_t color);
 void canvas_init(canvas_config_t *cfg);
 void canvas_destroy(canvas_config_t *cfg);
+void canvas_update_color_depth(canvas_config_t *cfg);
 
 // Properties
 void canvas_set_mirror(canvas_config_t *cfg, uint8_t mirror);
@@ -95,5 +96,7 @@ void canvas_draw_bitmap(canvas_config_t *cfg, const uint8_t *imageBuffer, uint16
 
 // General
 void canvas_refresh_screen(canvas_config_t *cfg);
+void canvas_refresh_partial(canvas_config_t *cfg, uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1);
+void canvas_init_partial(canvas_config_t *cfg);
 
 #endif //EPDDRAW_H

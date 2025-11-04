@@ -142,7 +142,7 @@ void epd_display_base(epd_config_t *cfg, uint8_t *image) {
 		epd_send_data(cfg, image[i]);
 	}
 
-	epd_send_command(cfg, 0x26);   //Write Black and White image to RAM
+	epd_send_command(cfg, 0x26);   //Write Black and White image to RED-RAM
 	for ( i=0; i<4736; i++ )
 	{               
 		epd_send_data(cfg, image[i]);
@@ -276,7 +276,7 @@ void epd_display_partial(epd_config_t *cfg, uint8_t *image) {
     epd_set_cursor(cfg, 0, 0);
 
     epd_send_command(cfg, 0x24); //Write Black and white Image to RAM
-    for(i - 0; i < 4736; i ++) {
+    for(i = 0; i < 4736; i ++) {
         epd_send_data(cfg, image[i]);
     }
     epd_refresh_partial(cfg);
@@ -309,7 +309,7 @@ parameter:  cfg
 ******************************************************************************/
 void epd_refresh_partial(epd_config_t *cfg) {
     epd_send_command(cfg, 0x22); //Display Update Control
-	epd_send_data(cfg, 0x0F);
+	epd_send_data(cfg, 0xCF);
 	epd_send_command(cfg, 0x20); //Activate Display Update Sequence
 	epd_read_busy(cfg);
 }
@@ -340,7 +340,7 @@ parameter:  cfg, xStart, yStart
 ******************************************************************************/
 void epd_set_cursor(epd_config_t *cfg, uint16_t xStart, uint16_t yStart) {
     epd_send_command(cfg, 0x4e); // Set Ram X Counter
-    epd_send_data(cfg, xStart & 0xFF);
+    epd_send_data(cfg, (xStart >> 3) & 0xFF);
 
     epd_send_command(cfg, 0x4F); // Set Ram Y Counter
     epd_send_data(cfg, yStart & 0xFF);
@@ -366,6 +366,17 @@ void epd_send_data(epd_config_t *cfg, uint8_t data) {
     epd_digital_write(cfg->pin_dc, 1);
     epd_digital_write(cfg->pin_cs, 0);
     epd_spi_write(cfg, data);
+    epd_digital_write(cfg->pin_cs, 1);
+}
+
+/******************************************************************************
+function :	send data-buffer
+parameter:  cfg, data
+******************************************************************************/
+void epd_send_data_len(epd_config_t *cfg, const uint8_t *data, size_t len) {
+    epd_digital_write(cfg->pin_dc, 1);   // DATA mode
+    epd_digital_write(cfg->pin_cs, 0);
+    epd_spi_write_len(cfg, (uint8_t*)data, len);
     epd_digital_write(cfg->pin_cs, 1);
 }
 
@@ -542,4 +553,72 @@ parameter:  cfg, data-ptr, len
 ******************************************************************************/
 void epd_spi_write_len(epd_config_t *cfg, uint8_t *data, uint32_t len) {
     spi_write_blocking(cfg->epd_port_spi, data, len);
+}
+
+/******************************************************************************
+function :	send partition of the framebuffer to the epd
+parameter:  cfg, data-ptr, len
+******************************************************************************/
+void epd_send_partial(epd_config_t *cfg, const uint8_t *buffer, uint16_t byteWidth, uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1) {
+    uint16_t xs = x0 & ~7u;
+    uint16_t xe = x1 | 7u;
+    if (xe >= byteWidth * 8) xe = (uint16_t)(byteWidth * 8 - 1);
+
+    uint8_t byte_start_x = (xs >> 3);    //Divide by 8
+    uint8_t byte_end_x = (xe >> 3);      //Divide by 8
+    uint16_t line_bytes = (uint16_t)(byte_end_x - byte_start_x + 1);    //How many bytes per row
+
+    printf("Data: start: %u, end: %u, per_line: %u", byte_start_x, byte_end_x, line_bytes);
+
+    for (uint16_t y = y0; y <= y1; y++) {
+        epd_set_cursor(cfg, byte_start_x, y);
+        epd_send_command(cfg, 0x24);
+        const uint8_t *src = buffer + ((size_t)y * byteWidth + byte_start_x);
+        epd_send_data_len(cfg, src, line_bytes);
+    }
+    epd_set_partial(cfg, byte_start_x, y0, byte_end_x, y1);
+    /*
+    for (uint16_t y = y0; y <= y1; y++) {
+        epd_set_cursor(cfg, byte_start_x, y);
+        epd_send_command(cfg, 0x24);
+        for (uint16_t x = byte_start_x; x <= byte_end_x; x++) {
+            uint16_t index = x + y * byteWidth;
+            epd_send_data(cfg, buffer[index]);
+        }
+    }
+    */
+
+    epd_refresh_partial(cfg);
+}
+
+/******************************************************************************
+function :	prepares a partial update on the epd
+parameter:  cfg
+******************************************************************************/
+void epd_prepare_partial(epd_config_t *cfg) {
+    // Load the partial waveform
+    epd_lut(cfg, _WF_PARTIAL_2IN9);                                // 0x32 + 153 bytes + busy wait  :contentReference[oaicite:2]{index=2}
+
+    // Magic block (panel-internal settings for partial)
+    epd_send_command(cfg, 0x37);
+    epd_send_data(cfg, 0x00);
+    epd_send_data(cfg, 0x00);
+    epd_send_data(cfg, 0x00);
+    epd_send_data(cfg, 0x00);
+    epd_send_data(cfg, 0x00);
+    epd_send_data(cfg, 0x40);
+    epd_send_data(cfg, 0x00);
+    epd_send_data(cfg, 0x00);
+    epd_send_data(cfg, 0x00);
+    epd_send_data(cfg, 0x00);                                      // same as your partial path  :contentReference[oaicite:3]{index=3}
+
+    // Border waveform
+    epd_send_command(cfg, 0x3C);
+    epd_send_data(cfg, 0x80);                                      // :contentReference[oaicite:4]{index=4}
+
+    // Precharge/update control (required once after LUT change)
+    epd_send_command(cfg, 0x22);
+    epd_send_data(cfg, 0xC0);
+    epd_send_command(cfg, 0x20);
+    epd_read_busy(cfg);                                            // wait for controller ready  :contentReference[oaicite:5]{index=5}
 }
