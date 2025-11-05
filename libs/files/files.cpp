@@ -130,6 +130,8 @@ FRESULT FileManager::init() {
         return fr;
     }
 
+    
+
     fr = f_open(&songDB, "songs.db", FA_READ);
     if (fr != FR_OK) {
         printf("Failed to open songs.db: %d\n", fr);

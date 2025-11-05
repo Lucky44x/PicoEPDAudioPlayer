@@ -44,8 +44,9 @@ void core1_entry() {
 
 int main()
 {
-    int current_song = 0;
     stdio_init_all();
+
+    sleep_ms(10000);
 
     //Launch EPD
     printf("Launching EPD-Driver\n");
@@ -125,39 +126,10 @@ int main()
             printf("Input Event: %u, %u\n", ev.code, ev.type);
         }
 
+        // Ui Updates
         uiManager.update();
 
+        // Audio pump
         g_core.pump();
-        /*
-        // Audio stuff
-        if (g_core.awaitingNext()) { 
-            g_core.mute(true);
-            current_song ++;
-            if (!g_core.start_song(current_song)) break;
-            g_core.mute(false);
-        }
-
-        g_core.pump();
-        */
     }
-    /*
-    if (!g_core.start_song(0)) {
-        printf("Could not open song 0 from disk");
-        while(true) sleep_ms(100);
-    }
-
-    printf("Tone test started..\n");
-
-    while (true) {
-        if (g_core.awaitingNext()) { 
-            g_core.mute(true);
-            if (!g_core.start_song(++current_song)) break;
-            g_core.mute(false);
-        }
-
-        g_core.pump();
-        //printf("test");
-        sleep_ms(1);
-    }
-    */
 }
