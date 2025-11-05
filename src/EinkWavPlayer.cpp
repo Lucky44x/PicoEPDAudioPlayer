@@ -14,8 +14,10 @@ UIManager uiManager;
 InputManager inputManager;
 
 //Menus
+PlaybackMenu playbackMenu(&uiManager, &fileManager, &g_core, &inputManager);
 ErrorMenu errorMenu(&uiManager, &fileManager);
 MainMenu mainMenuUI(&uiManager, &fileManager);
+SongMenu songMenuUI(&uiManager, &fileManager, &mainMenuUI, &playbackMenu, &errorMenu);
 
 void core1_entry() {
     audio_player_config_t cfg = {
@@ -44,21 +46,22 @@ int main()
 {
     int current_song = 0;
     stdio_init_all();
-    sleep_ms(10000); //Allow USB serial
 
     //Launch EPD
     printf("Launching EPD-Driver\n");
     uiManager.init();
+    mainMenuUI.setup(&songMenuUI);
+    playbackMenu.setup(&songMenuUI);
     sleep_ms(100);
 
     printf("Launching Input-Manager\n");
-    inputManager.init(8000);
+    inputManager.init(2000);
     bool input_ok = true;
 
-    //if (!inputManager.register_button_pin(17,BUTTON_PREV) input_ok = false; TODO: 17 is double soldered, move connection to 26 instead
+    if (!inputManager.register_button_pin(26, BUTTON_PREV)) input_ok = false;
     if (!inputManager.register_button_pin(9, BUTTON_PLAY)) input_ok = false;
     if (!inputManager.register_button_pin(22, BUTTON_NEXT)) input_ok = false;
-    //if (!inputManager.register_button_pin(16,BUTTON_UP)) input_ok = false; TODO: 16 is double soldered, move connection to other port
+    if (!inputManager.register_button_pin(5,BUTTON_UP)) input_ok = false;
     if (!inputManager.register_button_pin(15, BUTTON_SELECT)) input_ok = false;
     if (!inputManager.register_button_pin(14, BUTTON_DOWN)) input_ok = false;
 
@@ -95,12 +98,6 @@ int main()
     }
     printf("Core1 ready... Launching Audio-Core\n");
 
-    // If everything is fine, load main-menu selection
-    errorMenu.set_fallback(&mainMenuUI);
-    errorMenu.set_message_utf8("TEST");
-    uiManager.switch_menu(&errorMenu);
-    uiManager.redraw();
-
     if (!g_core.open()) {
         printf("Audio core could not start\n");
         errorMenu.set_message_utf8("Audio failed...");
@@ -109,6 +106,8 @@ int main()
         return 1;
     }
     g_core.mute(true);
+
+    uiManager.switch_menu(&mainMenuUI);
 
     /*
     if (!g_core.start_song(0)) {
@@ -126,6 +125,9 @@ int main()
             printf("Input Event: %u, %u\n", ev.code, ev.type);
         }
 
+        uiManager.update();
+
+        g_core.pump();
         /*
         // Audio stuff
         if (g_core.awaitingNext()) { 

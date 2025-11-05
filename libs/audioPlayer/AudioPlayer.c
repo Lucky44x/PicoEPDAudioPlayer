@@ -63,7 +63,7 @@ bool audio_player_init(audio_player_handle_t *h, const audio_player_config_t *cf
 // Start / stop the I2S Engine (DMA + PIO)
 bool audio_player_start(audio_player_handle_t *h) {
     if (!h || h->running) return false;
-    if (xsmt_pin != 0xFFFF) gpio_put(xsmt_pin, 1);  // unmute if defined
+    //if (xsmt_pin != 0xFFFF) gpio_put(xsmt_pin, 1);  // unmute if defined
 
     audio_i2s_set_enabled(true);
     h->running = true;
@@ -112,4 +112,15 @@ size_t audio_player_write_pcm(audio_player_handle_t *h, const int16_t *stereo, s
         done += n;
     }
     return done;
+}
+
+void audio_player_prime_silence(audio_player_handle_t *h, int n_buffers) {
+    if (!h || !h->producer_pool) return;
+    while (n_buffers-- > 0) {
+        audio_buffer_t *b = audio_player_take_buffer(h, true); // block until you get one
+        if (!b) break;
+        memset(b->buffer->bytes, 0, b->max_sample_count * 2 /*ch*/ * (i2s_in_fmt.pcm_format == AUDIO_PCM_FORMAT_S32 ? 4 : 2));
+        b->sample_count = b->max_sample_count;
+        audio_player_queue_buffer(h, b);
+    }
 }

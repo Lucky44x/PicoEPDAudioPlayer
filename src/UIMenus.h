@@ -6,9 +6,10 @@
 #include <memory.h>
 #include "files.h"
 #include "input.h"
+#include "AudioCore.h"
 
 extern "C" {
-#include "epdDraw.h"
+    #include "epdDraw.h"
 }
 
 #define BUTTON_PREV 1
@@ -73,6 +74,10 @@ static void print_hex(const char* label, const uint8_t* data, size_t len) {
 
 class UIMenu;
 class UIManager;
+class PlaybackMenu;
+class SongMenu;
+class MainMenu;
+class ErrorMenu;
 
 class UIManager {
     public:
@@ -128,36 +133,77 @@ class MainMenu : public UIMenu {
     public:
         explicit MainMenu(UIManager *parent, FileManager *fm);
         void start_menu() override;
-        void update_menu() override;
         void button_input(InputEvent &e) override;
         void draw_menu(canvas_config_t *canvas) override;
+        void update_menu() override;
         void close_menu() override;
+        void setup(SongMenu *songMenu) { this->songMenu = songMenu; };
     private:
+        SongMenu *songMenu;
         FileManager *fm;
         uint selected_index = 0;
         uint updates = 0;
         canvas_config_t *cached_canvas;
 };
 
+class PlaybackMenu : public UIMenu {
+    public:
+        explicit PlaybackMenu(UIManager *parent, FileManager *fm, AudioCore *ac, InputManager *im);
+        void start_menu() override;
+        void button_input(InputEvent &e) override;
+        void draw_menu(canvas_config_t *canvas) override;
+        void update_menu() override;
+        void close_menu() override;
+        FRESULT init(uint32_t songID, uint32_t albumID);
+
+        void setup(SongMenu *sm) { this->sm = sm; };
+    private:
+        void skip_forwards();
+        void skip_backwards();
+        void switch_loop();
+        //void switch_shuffle();
+
+        uint32_t songID;
+        uint32_t global_song_id;
+        uint32_t albumID;
+
+        bool running;
+        bool loop_mode;         //  True -> Song-Loop   False -> List-Loop
+        bool shuffle_mode;      //  True -> Shuffle On  False -> Shuffle off
+
+        song_record_t song_record;
+        album_record_t album_record;
+        artist_record_t artist_record;
+
+        FileManager *fm;
+        AudioCore *ac;
+        InputManager *im;
+        SongMenu *sm;
+
+        canvas_config_t *cached_canvas;
+};
+
 class SongMenu : public UIMenu {
     public:
-        explicit SongMenu(UIManager *parent, uint16_t albumID);
+        explicit SongMenu(UIManager *parent, FileManager *fm, MainMenu *mainMenu, PlaybackMenu *playbackMenu, ErrorMenu *errorMenu);
 
         void start_menu() override;
         void button_input(InputEvent &e) override;
         void draw_menu(canvas_config_t *canvas) override;
+        void update_menu() override;
+        void close_menu() override;
+        void init(uint16_t albumID);
     private:
-        uint16_t albumID;
-};
-
-class Playback : public UIMenu {
-    public:
-        explicit Playback(UIManager *parent, FileManager *fm);
-        void start_menu() override;
-        void button_input(InputEvent &e) override;
-    private:
-        song_record_t *song;
+        MainMenu *mainMenu;
+        PlaybackMenu *playbackMenu;
+        ErrorMenu *errorMenu;
         FileManager *fm;
+
+        uint16_t albumID;
+        album_record_t album_record;
+        uint32_t selected_index;
+        uint32_t updates = 0;
+        canvas_config_t *cached_canvas;
 };
 
 #endif

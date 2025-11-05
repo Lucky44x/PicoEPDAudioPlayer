@@ -429,22 +429,38 @@ uint8_t canvas_get_char_width(uint16_t character) {
 function :  Draws the given Bitmap on the canvas
 parameter:  cfg, image-data ptr, xPoint, yPoint, width, height
 ******************************************************************************/
-void canvas_draw_bitmap(canvas_config_t *cfg, const uint8_t *imageBuffer, uint16_t xPoint, uint16_t yPoint, uint16_t width, uint16_t height) {
+void canvas_draw_bitmap(canvas_config_t *cfg, const uint8_t *imageBuffer, uint16_t xPoint, uint16_t yPoint, uint16_t width, uint16_t height, uint8_t bpp, bool invert) {
     if (!imageBuffer) return;
 
     for ( uint16_t y = 0; y < height; ++y ) {
         for ( uint16_t x = 0; x < width; ++x ) {
             uint32_t i = (uint32_t)y * width + x;     // pixel index in the source
-            uint8_t byte = imageBuffer[i >> 2];      // 4 pixels per byte
-            uint8_t shift = 6 - ((i & 3) << 1);       // 6,4,2,0
-            uint8_t v = (byte >> shift) & 0x03;       // 0..3
+            uint8_t v = 0;
+
+            if (bpp == 2) {
+                uint8_t byte = imageBuffer[i >> 2];     // 4 pixels per byte
+                uint8_t shift = 6 - ((i & 3) << 1);     // 6,4,2,0
+                v = (byte >> shift) & 0x03;             // 0..3
+            } else if (bpp == 1) {
+                uint8_t byte = imageBuffer[i >> 3];     // 8 pixels per byte
+                uint8_t shift = 7 - (i & 7);            // 6,4,2,0
+                v = (byte >> shift) & 0x01;             // 0..1
+                if (cfg->colorscale==4) v *= 0x03;      // Push values to 0..3 if we are in grayscale mode
+            }
 
             if (cfg->colorscale == 4) {
+                if (invert) v = 3 - v;
                 // grayscale framebuffer: SetPixel expects 0..3 (0=whitest, 3=blackest)
                 canvas_set_pixel(cfg, xPoint + x, yPoint + y, v);
             } else {
-                // 1bpp framebuffer: simple threshold (tweak if you prefer different cutoff)
-                canvas_set_pixel(cfg, xPoint + x, yPoint + y, (v >= 2) ? CANVAS_COLOR_BW_BLACK : CANVAS_COLOR_BW_WHITE);
+                if (bpp == 2) {
+                    if (invert) v = 3 - v;
+                    canvas_set_pixel(cfg, xPoint + x, yPoint + y, (v >= 2) ? CANVAS_COLOR_BW_BLACK : CANVAS_COLOR_BW_WHITE);
+                }
+                else {
+                    if (invert) v = !v;
+                    canvas_set_pixel(cfg, xPoint + x, yPoint + y, v ? CANVAS_COLOR_BW_BLACK : CANVAS_COLOR_BW_WHITE);
+                }
             }
         }
     }
@@ -489,6 +505,22 @@ void canvas_refresh_partial(canvas_config_t *cfg, uint16_t x0, uint16_t y0, uint
     if (py1 >= cfg->heightMem) py1 = cfg->heightMem - 1;
 
     epd_send_partial(&cfg->driverConfig, cfg->frameBuffer, cfg->widthBytes, px0, py0, px1, py1);
+}
+
+/******************************************************************************
+function :	Updates the screen in fullscreen-mode but fast
+parameter:  cfg
+******************************************************************************/
+void canvas_refresh_screen_fast(canvas_config_t *cfg) {
+    if (cfg->colorscale==4) {
+        static const uint16_t msg[16] = {'O','n','l','y', ' ', 'B', '/','W', ' ', 'a', 'l', 'l', 'o', 'w', 'e', 'd'};
+        canvas_clear(cfg, CANVAS_COLOR_GRAY_G4);
+        canvas_draw_text(cfg, msg, 16, 8, 8, CANVAS_COLOR_GRAY_G1, 2, 0);
+        canvas_refresh_screen(cfg);
+        return;
+    }
+
+    epd_display_partial(&cfg->driverConfig, cfg->frameBuffer);
 }
 
 /******************************************************************************

@@ -149,7 +149,13 @@ FRESULT FileManager::init() {
     if (fr != FR_OK) {
         printf("Failed to open albums.db: %d\n", fr);
         return fr;
-    }
+    } 
+
+    // Get Album-Count
+    uint8_t buf[3];
+    FRESULT album_fr = read_exact_at(&albumDB, 0, buf, 3);
+    if (album_fr != FR_OK) return fr;
+    album_count = read_u24le(buf);
 
     fr = f_open(&imageDB, "images.db", FA_READ);
     if (fr != FR_OK) {
@@ -185,22 +191,42 @@ FRESULT FileManager::read_song_index(uint32_t index, song_record_t* out) {
     return FR_OK;
 }
 
+FRESULT FileManager::read_song_index_from_album(uint32_t index_in_album, album_record_t *album, uint32_t *out) {
+    FSIZE_t off = (FSIZE_t)index_in_album * 3 + album->song_list_off;
+    FRESULT fr = f_lseek(&albumDB, off);
+    if (fr != FR_OK) return fr;
+
+    UINT br;
+    uint8_t buf[3];
+    fr = f_read(&albumDB, buf, 3, &br);
+    if (fr != FR_OK) return fr;
+    if (br != 3) return FR_INT_ERR;
+
+    *out = read_u24le(buf);
+    return fr;
+}
+
+FRESULT FileManager::read_song_album_index(uint32_t index_in_album, album_record_t *album, song_record_t *out) {
+    FSIZE_t off = (FSIZE_t)index_in_album * 3 + album->song_list_off;
+    FRESULT fr = f_lseek(&albumDB, off);
+    if (fr != FR_OK) return fr;
+
+    UINT br;
+    uint8_t buf[3];
+    fr = f_read(&albumDB, buf, 3, &br);
+    if (fr != FR_OK) return fr;
+    if (br != 3) return FR_INT_ERR;
+
+    uint32_t song_idx = read_u24le(buf);
+    return read_song_index(song_idx, out);
+}
+
 uint32_t FileManager::read_song_count() {
     return song_count;
 }
 
 uint32_t FileManager::read_album_count() {
-    FIL f;
-    if (f_open(&f, "/albums.db", FA_READ) != FR_OK) return 0;
-
-    uint8_t hdr[53];
-    UINT br;
-    if (f_read(&f, hdr, 53, &br) != FR_OK || br != 53) { f_close(&f); return 0; }
-
-    uint32_t first_offset = hdr[47] | (hdr[48]<<8) | (hdr[49]<<16);
-    f_close(&f);
-
-    return first_offset / 53;   // exact album count
+    return album_count;
 }
 
 FRESULT FileManager::read_artist_index(uint32_t index, artist_record_t* out) {
@@ -220,7 +246,7 @@ FRESULT FileManager::read_artist_index(uint32_t index, artist_record_t* out) {
 FRESULT FileManager::read_album_index(uint32_t index, album_record_t* out) {
     if (!out) return FR_INT_ERR;
 
-    const FSIZE_t off = (FSIZE_t)index * ALBUM_RECORD_SIZE;
+    const FSIZE_t off = (FSIZE_t)index * ALBUM_RECORD_SIZE + 3;
     if (off + ALBUM_RECORD_SIZE> f_size(&albumDB)) return FR_INT_ERR;
 
     uint8_t buf[ALBUM_RECORD_SIZE];

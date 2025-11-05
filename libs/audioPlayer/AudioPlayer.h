@@ -40,6 +40,7 @@ void audio_player_mute(bool muted);
 audio_buffer_t* audio_player_take_buffer(audio_player_handle_t *h, bool block);
 void audio_player_queue_buffer(audio_player_handle_t *h, audio_buffer_t *buf);
 size_t audio_player_write_pcm(audio_player_handle_t *h, const int16_t *stereo, size_t frames);
+void audio_player_prime_silence(audio_player_handle_t *h, int n_buffers);
 
 #ifdef __cplusplus
 }

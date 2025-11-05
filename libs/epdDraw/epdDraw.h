@@ -92,11 +92,12 @@ void canvas_draw_circle(canvas_config_t *cfg, uint16_t xCenter, uint16_t yCenter
 uint8_t canvas_draw_char(canvas_config_t *cfg, uint16_t character, uint16_t xPoint, uint16_t yPoint, uint8_t color);
 void canvas_draw_text(canvas_config_t *cfg, const uint16_t *text, size_t len, uint16_t xPoint, uint16_t yPoint, uint8_t color, uint8_t spacing, uint16_t maxTextArea);
 uint8_t canvas_get_char_width(uint16_t character);
-void canvas_draw_bitmap(canvas_config_t *cfg, const uint8_t *imageBuffer, uint16_t xPoint, uint16_t yPoint, uint16_t width, uint16_t height);
+void canvas_draw_bitmap(canvas_config_t *cfg, const uint8_t *imageBuffer, uint16_t xPoint, uint16_t yPoint, uint16_t width, uint16_t height, uint8_t bpp, bool invert);
 
 // General
 void canvas_refresh_screen(canvas_config_t *cfg);
 void canvas_refresh_partial(canvas_config_t *cfg, uint16_t x0, uint16_t y0, uint16_t x1, uint16_t y1);
 void canvas_init_partial(canvas_config_t *cfg);
+void canvas_refresh_screen_fast(canvas_config_t *cfg);
 
 #endif //EPDDRAW_H

@@ -47,6 +47,8 @@
         "epddraw-impl.h": "c",
         "epddraw.h": "c",
         "functional": "c",
-        "epd2in9.h": "c"
+        "epd2in9.h": "c",
+        "text_encoding": "cpp",
+        "typeinfo": "cpp"
     }
 }

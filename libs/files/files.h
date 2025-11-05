@@ -42,9 +42,11 @@ class FileManager {
         FRESULT init();
         FRESULT deinit();
         FRESULT read_song_index(uint32_t index, song_record_t *out);
+        FRESULT read_song_album_index(uint32_t index, album_record_t *album, song_record_t *out);
         FRESULT read_artist_index(uint32_t index, artist_record_t *out);
         FRESULT read_album_index(uint32_t index, album_record_t *out);
         FRESULT read_image_index(uint32_t index, uint8_t *out);
+        FRESULT read_song_index_from_album(uint32_t index_in_album, album_record_t *album, uint32_t *out);
 
         uint32_t read_song_count();
         uint32_t read_album_count();
@@ -60,6 +62,7 @@ class FileManager {
         FIL albumDB;
         FIL imageDB;
         uint32_t song_count;
+        uint32_t album_count;
 };
 
 //DR_WAV specific implementations

@@ -20,15 +20,24 @@ class AudioCore {
         void stop();
         void mute(bool muted);
         void pump();
+        void change_volume(int delta);
+        void pause(bool state);
+        bool isPaused() const { return m_paused; }
 
         bool awaitingNext() const { return !m_running && m_eof; }
     private:
+        void apply_volume(int16_t *s, size_t frames);
+
         //File
         drwav m_wav;
 
         //Stream Data
+        bool m_paused = false;
         bool m_running = false;
         bool m_eof = false;
+        uint16_t m_vol_q8_8 = 8; // 100%
+        uint64_t played_samples;
+        bool first_frames_finished = false;
 
         //Instances
         audio_player_handle_t *m_player = nullptr;

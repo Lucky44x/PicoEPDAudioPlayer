@@ -1,5 +1,9 @@
 #include "UIMenus.h"
 
+/*
+ *  Most of this functionallity could have been handeled via a Stack and it would've been much safer and easier to work with, but whatever 
+ */
+
 UIManager::UIManager() {}
 
 void UIManager::init() {
@@ -10,6 +14,7 @@ void UIManager::init() {
 void UIManager::switch_menu(UIMenu *menu) {
     if (currentMenu) currentMenu->close_menu();
     currentMenu = menu;
+    redraw();
     currentMenu->start_menu();
 }
 

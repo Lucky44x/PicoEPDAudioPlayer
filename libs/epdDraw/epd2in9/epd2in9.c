@@ -570,13 +570,14 @@ void epd_send_partial(epd_config_t *cfg, const uint8_t *buffer, uint16_t byteWid
 
     //printf("Data: start: %u, end: %u, per_line: %u", byte_start_x, byte_end_x, line_bytes);
 
+   //epd_set_partial(cfg, 0, 0, EPD_WIDTH-1, EPD_HEIGHT-1);
     for (uint16_t y = y0; y <= y1; y++) {
         epd_set_cursor(cfg, byte_start_x, y);
         epd_send_command(cfg, 0x24);
         const uint8_t *src = buffer + ((size_t)y * byteWidth + byte_start_x);
         epd_send_data_len(cfg, src, line_bytes);
     }
-    epd_set_partial(cfg, byte_start_x, y0, byte_end_x, y1);
+    epd_set_partial(cfg, x0, y0, x1, y1);
     /*
     for (uint16_t y = y0; y <= y1; y++) {
         epd_set_cursor(cfg, byte_start_x, y);
