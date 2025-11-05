@@ -107,6 +107,7 @@ void AudioCore::pump() {
 
         const size_t want_frames = b->max_sample_count;
         int16_t *dst = (int16_t *)b->buffer->bytes;
+        memset(dst, 0, want_frames * 2 * sizeof(int16_t));
 
         size_t frames_read = 0;
         if (m_paused || m_eof || !m_running) {
