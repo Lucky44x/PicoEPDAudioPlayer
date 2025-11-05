@@ -1,5 +1,8 @@
 # PICO-EPD-WAV-PLAYER
 
+## NOTE
+This project **DOES NOT** run on a normal Raspberry PI-Pico, as that system has only 2 MB of flash memory, and my font-binary alone has 1.7 MB. Instead, use one of the many 16 MB RP2040 boards that are widely available
+
 **This Project is heavily inspired by [Elehobica's Pico-WAV-Player](https://github.com/elehobica/RPi_Pico_WAV_Player) and borrows many design- and technical aspects from it**
 _(Or in other words: Why reinvent the Wheel when it is already there? ʕ •ᴥ•ʔ )_ 
 
@@ -7,6 +10,7 @@ _(Or in other words: Why reinvent the Wheel when it is already there? ʕ •ᴥ�
 - [Elehobica's](https://github.com/elehobica) [pico_audio_i2s_32b](https://github.com/elehobica/pico_audio_i2s_32b)
 - [Elehobica's](https://github.com/elehobica) [pcio_fatfs implementation](https://github.com/elehobica/pico_fatfs)
 - [WaveShare's](https://github.com/waveshareteam) [e-Paper Library](https://github.com/waveshareteam/e-Paper) _(Heavily modified to suit my needs and naming-convention)_
+- [mackron's](https://github.com/mackron) [dr_libs headers](https://github.com/mackron/dr_libs) _(for audio decoding/streaming... by changing the used library from dr_wav to dr_mp3, the player could theoretically play mp3 files)_
   
 ### Other Projects linked to this one
 - [Pico-EPD-WAV-Player File-Manager](https://github.com/Lucky44x/PicoEPDWavplayer-Manager) _(the accompanying software, to actually build the Databases that this firmware understands)_
