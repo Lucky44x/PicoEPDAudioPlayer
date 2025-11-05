@@ -156,10 +156,13 @@ class PlaybackMenu : public UIMenu {
         void close_menu() override;
         FRESULT init(uint32_t songID, uint32_t albumID);
 
+        bool begin_playback();
+
         void setup(SongMenu *sm) { this->sm = sm; };
     private:
         void skip_forwards();
         void skip_backwards();
+        void reset_current_song();
         void switch_loop();
         //void switch_shuffle();
 

@@ -223,6 +223,13 @@ void SongMenu::button_input(InputEvent &e) {
         }
 
         parentManager->switch_menu(playbackMenu);
+        bool playback_ok = playbackMenu->begin_playback();
+        if (!playback_ok) {
+            errorMenu->set_fallback(this);
+            errorMenu->set_message_utf8("Could not start this song");
+            parentManager->switch_menu(errorMenu);
+            return;
+        }
         return;
     }
 
@@ -307,7 +314,6 @@ void SongMenu::update_menu(){}
 PlaybackMenu::PlaybackMenu(UIManager *parent, FileManager *fm, AudioCore *ac, InputManager *im) : UIMenu(parent), fm(fm), ac(ac), im(im) {}
 
 void PlaybackMenu::start_menu() {
-    ac->mute(false);
     shuffle_mode = false;
     loop_mode = false;
     running = false;
@@ -338,10 +344,12 @@ void PlaybackMenu::draw_menu(canvas_config_t *canvas) {
 }
 
 FRESULT PlaybackMenu::init(uint32_t song_idx, uint32_t album_idx) {
+    if (song_idx < 0) song_idx = 0; // Do not wrap backwards just forwards (may change this later but not for now)
     this->songID = song_idx;
     this->albumID = album_idx;
 
     FRESULT fr;
+
     // Global song list
     if (albumID == -1) {
         if (song_idx >= fm->read_song_count()) {
@@ -381,6 +389,17 @@ FRESULT PlaybackMenu::init(uint32_t song_idx, uint32_t album_idx) {
     }
 
     return fr;
+}
+
+bool PlaybackMenu::begin_playback() {
+    ac->mute(true);
+    if (!ac->start_song(global_song_id)) { 
+        ac->stop();
+        ac->close();
+        return false;
+    }
+    ac->mute(false);
+    return true;
 }
 
 void PlaybackMenu::button_input(InputEvent &e) {
@@ -434,9 +453,9 @@ void PlaybackMenu::skip_forwards() {
     ac->mute(true);
     init(songID + 1, albumID);
     parentManager->redraw();
+    begin_playback();
     ac->pause(false);
     ac->mute(false);
-    //ac->mute(false);
 }
 
 void PlaybackMenu::skip_backwards() {
@@ -446,6 +465,18 @@ void PlaybackMenu::skip_backwards() {
     ac->mute(true);
     init(songID - 1, albumID);
     parentManager->redraw();
+    begin_playback();
+    ac->pause(false);
+    ac->mute(false);
+}
+
+void PlaybackMenu::reset_current_song() {
+    ac->stop();
+    sleep_us(500);
+    ac->pause(true);
+    ac->mute(true);
+    init(songID, albumID);
+    begin_playback();
     ac->pause(false);
     ac->mute(false);
 }
@@ -467,7 +498,8 @@ void PlaybackMenu::switch_loop() {
 
 void PlaybackMenu::update_menu() {
     if (ac->awaitingNext()) {
-        skip_forwards();
+        if(loop_mode) reset_current_song();
+        else skip_forwards();
     }
 }
 

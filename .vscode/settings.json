@@ -49,6 +49,7 @@
         "functional": "c",
         "epd2in9.h": "c",
         "text_encoding": "cpp",
-        "typeinfo": "cpp"
+        "typeinfo": "cpp",
+        "fstream": "cpp"
     }
 }
