@@ -139,6 +139,7 @@ static bool epd_queue_push_copy_small(epd_config_t *cfg, epd_packet_t *p_in, con
 void epd_send_command(epd_config_t *cfg, uint8_t reg);
 void epd_send_data(epd_config_t *cfg, uint8_t data);
 void epd_send_data_len(epd_config_t *cfg, const uint8_t *data, size_t len);
+void epd_send_data_len_dyn(epd_config_t *cfg, const uint8_t *data, size_t len);
 void epd_read_busy(epd_config_t *cfg);
 void epd_lut(epd_config_t *cfg, uint8_t *lut);
 void epd_lut_by_host(epd_config_t *cfg, uint8_t *lut);

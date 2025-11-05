@@ -20,7 +20,7 @@ void UIManager::switch_menu(UIMenu *menu) {
 
 void UIManager::update() {
     // E-Ink service
-    epd_service_async(&canvas_cfg.driverConfig, 100000);
+    epd_service_async(&canvas_cfg.driverConfig, 10000);
 
     if (currentMenu != NULL) currentMenu->update_menu();
 }

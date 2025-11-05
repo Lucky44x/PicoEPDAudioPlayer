@@ -4,6 +4,7 @@
 #include "pico/stdlib.h"
 #include "hardware/spi.h"
 #include "stdio.h"
+#include <stdlib.h>
 
 #define EPD_WIDTH   128
 #define EPD_HEIGHT  296
@@ -33,6 +34,7 @@ typedef struct {
     uint32_t pos;           // WAIT: started flag   DATA: Bytes sent
     uint8_t small[16];
     bool use_small;
+    bool free_after;
 } epd_packet_t;
 
 

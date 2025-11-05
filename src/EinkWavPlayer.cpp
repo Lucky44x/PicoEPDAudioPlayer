@@ -70,7 +70,6 @@ int main()
         printf("Failed to initialize Input-Manager\n");
         errorMenu.set_message_utf8("Input init failed");
         uiManager.switch_menu(&errorMenu);
-        uiManager.redraw();
         return 1;
     }
 
@@ -81,7 +80,6 @@ int main()
         printf("Failed to initialize File-Manager %u", fileManager_ok);
         errorMenu.set_message_utf8("No SD-Card found");
         uiManager.switch_menu(&errorMenu);
-        uiManager.redraw();
         return 1;
     }
 
@@ -94,7 +92,6 @@ int main()
         printf("Core1 init failed\n");
         errorMenu.set_message_utf8("Core-1 failed...");
         uiManager.switch_menu(&errorMenu);
-        uiManager.redraw();
         return 1;
     }
     printf("Core1 ready... Launching Audio-Core\n");
@@ -103,7 +100,6 @@ int main()
         printf("Audio core could not start\n");
         errorMenu.set_message_utf8("Audio failed...");
         uiManager.switch_menu(&errorMenu);
-        uiManager.redraw();
         return 1;
     }
     g_core.mute(true);

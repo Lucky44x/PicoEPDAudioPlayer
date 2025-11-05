@@ -160,11 +160,9 @@ void MainMenu::draw_menu(canvas_config_t *canvas) {
 
     canvas_refresh_screen(canvas);
 
-    /*
     //Make sure no ghosting is left here
     canvas_draw_rect(canvas, 8, 4 + (selected_index * 16), 12, 20 + (selected_index * 16), CANVAS_COLOR_BW_BLACK, DOT_SIZE_1X1, DRAW_FILL_FULL);
     canvas_refresh_screen_fast(canvas);
-    */
     updates = 0;
 }
 

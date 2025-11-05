@@ -12,30 +12,33 @@
    - out_off is the output-byte offset (0..EPD_1B-1). We read 2*out_bytes from src starting at 2*out_off.
    - plane_bit: 0 = use LSB (for cmd 0x24), 1 = use MSB (for cmd 0x26).
    - We invert the chosen bit to match your “==0 → 1” mapping from the original code. */
-static void pack_2bpp_plane(const uint8_t *src2bpp, uint32_t out_off, uint8_t *dst1bpp, uint32_t out_bytes, int plane_bit)
+static void pack_2bpp_plane(const uint8_t *src2bpp, uint32_t out_off,
+                            uint8_t *dst1bpp, uint32_t out_bytes, int plane_bit)
 {
-    const uint32_t in_off = out_off * 2u; // 2B of 2bpp produce 1B of 1bpp
+    const uint32_t in_off = out_off * 2u;
     const uint8_t *in = src2bpp + in_off;
+
     for (uint32_t i = 0; i < out_bytes; ++i) {
-        uint8_t b0 = in[0], b1 = in[1];   // 8 pixels = 16 bits = 2 bytes (MSB-first pairs)
+        uint8_t b0 = in[0], b1 = in[1];
         uint8_t out = 0;
-        // Extract 8 consecutive 2-bit pixels from b0/b1 (MSB first): 11,00,10,01, then repeat
-        // Build output MSB->LSB
+
         for (int pix = 0; pix < 8; ++pix) {
-            // Which source bit pair are we at?
-            // For pix 0..3 take from b0; pix 4..7 from b1.
-            uint8_t byte = (pix < 4) ? b0 : b1;
-            int shift = 6 - 2 * (pix & 3);        // 6,4,2,0 then again
-            uint8_t two = (byte >> shift) & 0x3;  // [MSB:bit1, LSB:bit0]
+            uint8_t byte  = (pix < 4) ? b0 : b1;
+            int      shift = 6 - 2 * (pix & 3);
+            uint8_t  two   = (byte >> shift) & 0x03;
 
-            uint8_t bit = (plane_bit == 0) ? (two & 1u)         // LSB
-                                           : ((two >> 1) & 1u); // MSB
-            bit ^= 1u; // invert to match your mapping (00/10 → 1 for 0x24; 00/01 → 1 for 0x26, etc.)
-
+            uint8_t bit;
+            switch (two) {
+            case 0x3: bit = (plane_bit == 0) ? 1 : 0; break; // 11 → white
+            case 0x0: bit = (plane_bit == 0) ? 0 : 1; break; // 00 → black
+            case 0x2: bit = (plane_bit == 0) ? 1 : 1; break; // 10 → light-gray
+            case 0x1: bit = (plane_bit == 0) ? 0 : 0; break; // 01 → dark-gray
+            }
             out = (uint8_t)((out << 1) | bit);
         }
+
         dst1bpp[i] = out;
-        in += 2; // next 8 pixels = next 2 bytes of 2bpp
+        in += 2;
     }
 }
 
@@ -185,22 +188,23 @@ parameter:  the pointer to the image data
 void epd_display_gray(epd_config_t *cfg, uint8_t *image) {
     // Tune chunk size: 256 output bytes → 512 input bytes; good balance for queue/service cadence
     enum { OUT_CHUNK = 256 };
-    uint8_t staging[OUT_CHUNK];
 
     // --- Plane for 0x24: use LSB (plane_bit = 0), inverted as per original
     epd_send_command(cfg, 0x24);
     for (uint32_t off = 0; off < EPD_1B; off += OUT_CHUNK) {
+        uint8_t *staging = malloc(OUT_CHUNK);
         uint32_t n = (EPD_1B - off) > OUT_CHUNK ? OUT_CHUNK : (EPD_1B - off);
         pack_2bpp_plane(image, off, staging, n, /*plane_bit=*/0);
-        epd_send_data_len(cfg, staging, n);
+        epd_send_data_len_dyn(cfg, staging, n);
     }
 
     // --- Plane for 0x26: use MSB (plane_bit = 1), inverted as per original
     epd_send_command(cfg, 0x26);
     for (uint32_t off = 0; off < EPD_1B; off += OUT_CHUNK) {
+        uint8_t *staging = malloc(OUT_CHUNK);
         uint32_t n = (EPD_1B - off) > OUT_CHUNK ? OUT_CHUNK : (EPD_1B - off);
         pack_2bpp_plane(image, off, staging, n, /*plane_bit=*/1);
-        epd_send_data_len(cfg, staging, n);
+        epd_send_data_len_dyn(cfg, staging, n);
     }
 
     epd_refresh_full(cfg); // enqueues 0x22/0x20 + WAIT_BUSY in your async path
@@ -243,9 +247,7 @@ void epd_display_partial(epd_config_t *cfg, uint8_t *image) {
     epd_set_cursor(cfg, 0, 0);
 
     epd_send_command(cfg, 0x24); //Write Black and white Image to RAM
-    for(i = 0; i < 4736; i ++) {
-        epd_send_data(cfg, image[i]);
-    }
+    epd_send_data_len(cfg, image, 4736);
     epd_refresh_partial(cfg);
 }
 
@@ -339,6 +341,15 @@ parameter:  cfg, data
 ******************************************************************************/
 void epd_send_data_len(epd_config_t *cfg, const uint8_t *data, size_t len) {
     epd_packet_t p = {.type=PACKET_DATA, .bytes=(uint8_t *)data, .len=len, .pos=0};
+    epd_queue_push(cfg, &p);
+}
+
+/******************************************************************************
+function :	send data-buffer dynamiclly (has to be freed after consume)
+parameter:  cfg, data
+******************************************************************************/
+void epd_send_data_len_dyn(epd_config_t *cfg, const uint8_t *data, size_t len) {
+    epd_packet_t p = {.type=PACKET_DATA, .bytes=(uint8_t *)data, .len=len, .pos=0, .free_after=true};
     epd_queue_push(cfg, &p);
 }
 
@@ -631,7 +642,11 @@ void epd_service_async(epd_config_t *cfg, uint32_t time_budget_us) {
             case PACKET_DATA:
                 uint32_t remain = cur.len - cur.pos;
                 printf("    Type Data: \n       Len: %u\n       Pos: %u\n       Remain: %u\n        First byte: 0x%02X\n", cur.len, cur.pos, remain, cur.bytes[0]);
-                if (!remain) { epd_queue_pop(cfg, &cur); continue; }
+                if (!remain) { 
+                    epd_queue_pop(cfg, &cur);
+                    if (cur.free_after) free(cur.bytes);
+                    continue; 
+                }
                 uint32_t n = (remain > CHUNK) ? CHUNK : remain;
 
                 epd_digital_write(cfg->pin_dc, 1);
