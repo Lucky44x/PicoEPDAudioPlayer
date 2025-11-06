@@ -15,28 +15,19 @@
 static void pack_2bpp_plane(const uint8_t *src2bpp, uint32_t out_off,
                             uint8_t *dst1bpp, uint32_t out_bytes, int plane_bit)
 {
-    const uint32_t in_off = out_off * 2u;
-    const uint8_t *in = src2bpp + in_off;
+    static const uint8_t map24[4] = {1,0,1,0}; // 00,01,10,11
+    static const uint8_t map26[4] = {1,1,0,0};
+    const uint8_t *map = plane_bit ? map26 : map24;
 
+    const uint8_t *in = src2bpp + out_off * 2u; // 2B in → 1B out
     for (uint32_t i = 0; i < out_bytes; ++i) {
-        uint8_t b0 = in[0], b1 = in[1];
-        uint8_t out = 0;
-
+        uint8_t b0 = in[0], b1 = in[1], out = 0;
         for (int pix = 0; pix < 8; ++pix) {
             uint8_t byte  = (pix < 4) ? b0 : b1;
-            int      shift = 6 - 2 * (pix & 3);
-            uint8_t  two   = (byte >> shift) & 0x03;
-
-            uint8_t bit;
-            switch (two) {
-            case 0x3: bit = (plane_bit == 0) ? 1 : 0; break; // 11 → white
-            case 0x0: bit = (plane_bit == 0) ? 0 : 1; break; // 00 → black
-            case 0x2: bit = (plane_bit == 0) ? 1 : 1; break; // 10 → light-gray
-            case 0x1: bit = (plane_bit == 0) ? 0 : 0; break; // 01 → dark-gray
-            }
-            out = (uint8_t)((out << 1) | bit);
+            int      sh   = 6 - 2 * (pix & 3);      // MSB-first pairs: 6,4,2,0
+            uint8_t  two  = (byte >> sh) & 0x3;    // 00,01,10,11
+            out = (uint8_t)((out << 1) | map[two]);
         }
-
         dst1bpp[i] = out;
         in += 2;
     }
@@ -606,16 +597,16 @@ void epd_service_async(epd_config_t *cfg, uint32_t time_budget_us) {
 
     while ((uint32_t)absolute_time_diff_us(t0, get_absolute_time()) < time_budget_us) {
         if (!epd_queue_peek(cfg, &cur)) return; // No packets left
-        printf("Service-tick, sending packet:\n");
+        //printf("Service-tick, sending packet:\n");
         // Switch type:
         switch(cur.type) {
             case PACKET_WAIT:
-                printf("    Type Wait: %u\n", cur.len);
+                //printf("    Type Wait: %u\n", cur.len);
                 sleep_ms(cur.len);
                 epd_queue_pop(cfg, &cur);
                 break;
             case PACKET_RESET:
-                printf("    Type Reset\n");
+                //printf("    Type Reset\n");
                 epd_digital_write(cfg->pin_rst, 1);
                 sleep_ms(10);
                 epd_digital_write(cfg->pin_rst, 0);
@@ -625,14 +616,14 @@ void epd_service_async(epd_config_t *cfg, uint32_t time_budget_us) {
                 epd_queue_pop(cfg, &cur);
                 break;
             case PACKET_WAIT_BUSY:
-                printf("    Waiting for busy to go low\n");
+                //printf("    Waiting for busy to go low\n");
                 if (epd_busy_low(cfg)) { 
                     epd_queue_pop(cfg, &cur);  // Pop waiting packet off queue to free sending up
                     continue;
                 }
                 return;                         // Try again next tick
             case PACKET_CMD:
-                printf("    Type Cmd 0x%02X\n", cur.cmd);
+                //printf("    Type Cmd 0x%02X\n", cur.cmd);
                 epd_digital_write(cfg->pin_dc, 0);
                 epd_digital_write(cfg->pin_cs, 0);
                 epd_spi_write(cfg, cur.cmd);
@@ -641,7 +632,7 @@ void epd_service_async(epd_config_t *cfg, uint32_t time_budget_us) {
                 break;
             case PACKET_DATA:
                 uint32_t remain = cur.len - cur.pos;
-                printf("    Type Data: \n       Len: %u\n       Pos: %u\n       Remain: %u\n        First byte: 0x%02X\n", cur.len, cur.pos, remain, cur.bytes[0]);
+                //printf("    Type Data: \n       Len: %u\n       Pos: %u\n       Remain: %u\n        First byte: 0x%02X\n", cur.len, cur.pos, remain, cur.bytes[0]);
                 if (!remain) { 
                     epd_queue_pop(cfg, &cur);
                     if (cur.free_after) free(cur.bytes);

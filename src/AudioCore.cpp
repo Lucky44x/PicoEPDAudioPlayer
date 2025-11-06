@@ -30,9 +30,14 @@ bool AudioCore::start_song(uint32_t song_index) {
     if (file_result != FR_OK) return false;
 
     drwav_bool32 wav_ok = drwav_init(&m_wav, wav_read, wav_seek, wav_tell, &(m_fm->current_song_file), NULL);
+
     if (!wav_ok) return false;
     m_eof = false;
     m_running = true;
+
+    uint32_t need_frames = (m_wav.sampleRate * 1000) / 1000; //1s of frames
+    drwav_read_pcm_frames_s16(&m_wav, need_frames, NULL);
+    drwav_seek_to_pcm_frame(&m_wav, need_frames);
 
     audio_player_prime_silence(m_player, 3);
     pause(false);

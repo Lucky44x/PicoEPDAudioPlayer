@@ -277,7 +277,7 @@ FRESULT FileManager::open_song_file(uint32_t index) {
     char fileName[37];
     md5_filename(selectedSong.md5, fileName);
 
-    printf("Opening File: %s", fileName);
+    printf("Opening File: %s\n", fileName);
     return f_open(&current_song_file, fileName, FA_READ);
 }
 

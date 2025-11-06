@@ -27,7 +27,7 @@ void UIManager::update() {
 
 void UIManager::redraw() {
     if (currentMenu != NULL) currentMenu->draw_menu(&canvas_cfg);
-    printf("Is active: %u\n", currentMenu != NULL);
+    //printf("Is active: %u\n", currentMenu != NULL);
 }
 
 void UIManager::input(InputEvent &event) {

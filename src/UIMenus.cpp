@@ -382,12 +382,6 @@ FRESULT PlaybackMenu::init(uint32_t song_idx, uint32_t album_idx) {
         if (fr != FR_OK) return fr;
     }
 
-    if (!ac->start_song(global_song_id)) { 
-        ac->stop();
-        ac->close();
-        return FR_DENIED;
-    }
-
     return fr;
 }
 

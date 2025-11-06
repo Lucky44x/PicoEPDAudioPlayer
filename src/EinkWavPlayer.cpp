@@ -7,6 +7,8 @@
 #include "AudioCore.h"
 #include "UIMenus.h"
 
+#include <malloc.h>
+
 audio_player_handle_t g_player;
 FileManager fileManager;
 AudioCore g_core(&g_player, &fileManager);
@@ -18,6 +20,18 @@ PlaybackMenu playbackMenu(&uiManager, &fileManager, &g_core, &inputManager);
 ErrorMenu errorMenu(&uiManager, &fileManager);
 MainMenu mainMenuUI(&uiManager, &fileManager);
 SongMenu songMenuUI(&uiManager, &fileManager, &mainMenuUI, &playbackMenu, &errorMenu);
+
+uint32_t getTotalHeap(void) {
+   extern char __StackLimit, __bss_end__;
+   
+   return &__StackLimit  - &__bss_end__;
+}
+
+uint32_t getFreeHeap(void) {
+   struct mallinfo m = mallinfo();
+
+   return getTotalHeap() - m.uordblks;
+}
 
 void core1_entry() {
     audio_player_config_t cfg = {
@@ -106,20 +120,16 @@ int main()
 
     uiManager.switch_menu(&mainMenuUI);
 
-    /*
-    if (!g_core.start_song(0)) {
-        printf("Could not open song 0 from disk");
-        while(true) sleep_ms(100);
-    }
-    */
-
     while (true) {
+
+        //printf("Memory info:\n");
+        //printf("%u / %u\n", getTotalHeap(), getFreeHeap());
 
         // Input stuff
         InputEvent ev;
         if (inputManager.poll_event(ev)) {
             uiManager.input(ev);
-            printf("Input Event: %u, %u\n", ev.code, ev.type);
+            //printf("Input Event: %u, %u\n", ev.code, ev.type);
         }
 
         // Ui Updates

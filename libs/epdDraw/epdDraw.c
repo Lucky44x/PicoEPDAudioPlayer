@@ -473,7 +473,7 @@ parameter:  cfg
 void canvas_push_framebuffer(canvas_config_t *cfg) {
     if ( cfg->colorscale == 4 ) epd_display_gray(&cfg->driverConfig, cfg->frameBuffer);
     else epd_display(&cfg->driverConfig, cfg->frameBuffer);
-    printf("Scale: %u\n", cfg->colorscale);
+    //printf("Scale: %u\n", cfg->colorscale);
 }
 
 void canvas_refresh_screen(canvas_config_t *cfg) {
