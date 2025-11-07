@@ -137,13 +137,21 @@ class MainMenu : public UIMenu {
         void draw_menu(canvas_config_t *canvas) override;
         void update_menu() override;
         void close_menu() override;
-        void setup(SongMenu *songMenu) { this->songMenu = songMenu; };
+        void setup(SongMenu *songMenu);
+
+        void select_page(uint32_t page);
     private:
         SongMenu *songMenu;
         FileManager *fm;
         uint selected_index = 0;
         uint updates = 0;
         canvas_config_t *cached_canvas;
+
+        uint32_t m_page = 0;
+        uint32_t m_pages = 0;
+
+        uint32_t m_album_count = 0;
+        uint32_t m_artist_count = 0;
 };
 
 class PlaybackMenu : public UIMenu {
@@ -196,6 +204,7 @@ class SongMenu : public UIMenu {
         void update_menu() override;
         void close_menu() override;
         void init(uint16_t albumID);
+        void select_page(uint32_t page);
     private:
         MainMenu *mainMenu;
         PlaybackMenu *playbackMenu;
@@ -207,6 +216,9 @@ class SongMenu : public UIMenu {
         uint32_t selected_index;
         uint32_t updates = 0;
         canvas_config_t *cached_canvas;
+
+        uint32_t m_page = 0;
+        uint32_t m_pages = 0;
 };
 
 #endif

@@ -25,11 +25,32 @@ static const uint8_t loop_list_icon[32] = {
     0xff, 0xff, 0x00, 0x7f, 0x00, 0x67, 0xff, 0xe1, 0xff, 0xe0, 0xff, 0xe3, 0xff, 0xef, 0xff, 0xff
 };
 
+static const uint8_t artist_icon[32] = {
+    0xff, 0xff, 0xff, 0xff, 0xfe, 0x7f, 0xfc, 0x3f, 0xf8, 0x1f, 0xf8, 0x1f, 0xf8, 0x1f, 0xfc, 0x3f, 
+    0xfc, 0x3f, 0xf8, 0x1f, 0xf0, 0x0f, 0xf0, 0x0f, 0xe0, 0x07, 0xf0, 0x0f, 0xff, 0xff, 0xff, 0xff
+};
+
 
 static inline size_t cp_len_0term(const uint16_t* s, size_t max_cp) {
     size_t i = 0;
     while (i < max_cp && s[i] != 0x0000) ++i;
     return i;
+}
+
+static size_t page_counter_to_u16(uint32_t m_page, uint32_t m_pages, uint16_t *out, size_t max_len) {
+    char ascii[32];
+    unsigned cur = (m_pages == 0) ? 0u : (unsigned)(m_page + 1u);
+    unsigned total = (unsigned)m_pages;
+
+    int n = snprintf(ascii, sizeof(ascii), "<%u/%u>", cur, total);
+    if (n<0) return 0;
+
+    if ((size_t)n >= sizeof(ascii)) {
+        ascii[sizeof(ascii) - 1] = '\0';
+        n = (int)(sizeof(ascii) - 1);
+    }
+
+    return utf8_to_16arr(ascii, out, max_len);
 }
 
 static void print_utf16le(const uint16_t *name, size_t codepoints) {
@@ -124,6 +145,17 @@ void ErrorMenu::close_menu() {}
 //Main Manager
 MainMenu::MainMenu(UIManager *parent, FileManager *fm) : UIMenu(parent), fm(fm) {}
 
+void MainMenu::setup(SongMenu* songMenu) { 
+    this->songMenu = songMenu; 
+    
+    m_album_count = fm->read_album_count();
+    m_artist_count = fm->read_artist_count();
+
+    // Calculate number of pages = (album-count + 1 virtual) / 7 entries per screen
+    m_pages = (m_album_count + 7) / 7;
+    printf("%u albums, %u pages", m_album_count, m_pages);
+};
+
 void MainMenu::start_menu() {
     printf("Starting Main-Menu\n");
 }
@@ -138,40 +170,79 @@ void MainMenu::draw_menu(canvas_config_t *canvas) {
     uint32_t xCoord = 16;
     uint32_t yCoord = 4;
 
-    uint16_t allArr[9] = { 'A', 'l', 'l', ' ', 'S', 'o', 'n', 'g', 's' };
-    canvas_draw_text(canvas, allArr, 9, xCoord, yCoord, CANVAS_COLOR_BW_BLACK, 2, 0);
-    canvas_draw_bitmap(canvas, (const uint8_t *)&all_songs_icon, 272, yCoord, 16, 16, 1, true);
-    yCoord += 16;
+    //Draw Page-Info
+    uint16_t buf[16];
+    size_t len = page_counter_to_u16(m_page, m_pages, buf, 16);
+    canvas_draw_text(canvas, buf, len, 296-(8 * (len + 1)), 0, CANVAS_COLOR_BW_BLACK, 2, 0);
 
-    uint16_t albumNum = fm->read_album_count();
-    printf("Album count: %u\n", albumNum);
-    for (uint i = 0; i < albumNum; i++) {
+    const uint32_t totalRows = m_album_count + 1; // Includes virtual "All-Songs" album
+    const uint32_t pageSize = 7;
+    const uint32_t rowStart = m_page * pageSize;
+
+    uint32_t remainingRows = (rowStart < totalRows) ? (totalRows - rowStart) : 0;
+    uint32_t rowsThisPage = (uint16_t)MIN(remainingRows, pageSize);
+
+    for (uint i = 0; i < rowsThisPage; ++i) {
+        const uint32_t rowIndex = rowStart + i;
+
+        if (rowIndex == 0) {
+            // First row of the whole list: the virtual entry.
+            uint16_t allArr[9] = { 'A','l','l',' ','S','o','n','g','s' };
+            canvas_draw_text(canvas, allArr, 9, xCoord, yCoord, CANVAS_COLOR_BW_BLACK, 2, 0);
+            yCoord += 16;
+            continue;
+        }
+
+        const uint32_t album_idx = rowIndex - 1;
         album_record_t curAlbum;
-        if (fm->read_album_index(i, &curAlbum) ){
-            printf("Could not read album %u\n", i);
+        if (fm->read_album_index(album_idx, &curAlbum) ){
+            printf("Could not read album %u\n", album_idx);
             break;
         }
         size_t name_len = cp_len_0term(curAlbum.name, ALBUM_NAME_CODEPOINTS);
         printf("Len: %u\n", name_len);
         print_utf16le(curAlbum.name, name_len);
         canvas_draw_text(canvas, curAlbum.name, name_len, xCoord, yCoord, CANVAS_COLOR_BW_BLACK, 2, 0);
+        // If album is artist-album -> albumcount - index <= artistcount - display artist icon
+        if ((m_album_count - album_idx) <= m_artist_count) canvas_draw_bitmap(canvas, artist_icon, 276, yCoord, 16, 16, 1, true);
+        else if (i != 0) canvas_draw_bitmap(canvas, all_songs_icon, 276, yCoord, 16, 16, 1, true);  // Page-Indicator takes precedent over icon
         yCoord += 16;
     }
 
     canvas_refresh_screen(canvas);
 
-    //Make sure no ghosting is left here
     canvas_draw_rect(canvas, 8, 4 + (selected_index * 16), 12, 20 + (selected_index * 16), CANVAS_COLOR_BW_BLACK, DOT_SIZE_1X1, DRAW_FILL_FULL);
     canvas_refresh_screen_fast(canvas);
     updates = 0;
 }
 
+void MainMenu::select_page(uint32_t page) {
+    if (page < 0 || page >= m_pages) return;
+    m_page = page;
+    selected_index = 0;
+    parentManager->redraw();
+}
+
 void MainMenu::button_input(InputEvent &e) {
     if (e.type == InputManager::EVENT_RELEASE) return;
 
+    if (e.code == BUTTON_NEXT && m_pages > 0) {
+        select_page(m_page + 1);
+        return;
+    } else if (e.code == BUTTON_PREV && m_pages > 0) {
+        select_page(m_page - 1);
+        return;
+    }
+
+    const uint32_t totalRows = m_album_count + 1; // "All Songs" + N albums
+    const uint32_t rowStart = m_page * 7;
+    const uint32_t rowIndex = rowStart + selected_index;
+    uint32_t remainingRows = (rowStart < totalRows) ? (totalRows - rowStart) : 0;
+    uint32_t rowsThisPage = (uint16_t)MIN(remainingRows, 7);
+
     // UI stuff
     if (e.code == BUTTON_SELECT) {
-        songMenu->init(selected_index);
+        songMenu->init(rowIndex);
         parentManager->switch_menu(songMenu);
         return;
     }
@@ -179,7 +250,7 @@ void MainMenu::button_input(InputEvent &e) {
     if (e.code == BUTTON_DOWN) selected_index += 1;
     if (e.code == BUTTON_UP) selected_index -= 1;
     selected_index = selected_index < 0 ?  0 : selected_index;
-    selected_index = selected_index > fm->read_album_count() ? fm->read_album_count() : selected_index;
+    selected_index = selected_index >= rowsThisPage ? rowsThisPage - 1 : selected_index;
 
     if (cached_canvas == nullptr) return;
     canvas_clear_partial(cached_canvas, 0, 0, 16, 127, CANVAS_COLOR_BW_WHITE);
@@ -208,13 +279,29 @@ void SongMenu::start_menu() {
 void SongMenu::button_input(InputEvent &e) {
     if (e.type == InputManager::EVENT_RELEASE) return;
 
-    // UI stuff
-    if (e.code == BUTTON_SELECT) {
-        if (selected_index == 0) {
+    if (e.code == BUTTON_NEXT && m_pages > 0) {
+        select_page(m_page + 1);
+        return;
+    } else if (e.code == BUTTON_PREV && m_pages > 0) {
+        if (m_page == 0) {
+            // Return to Main-Menu
             parentManager->switch_menu(mainMenu);
             return;
         }
-        FRESULT fr = playbackMenu->init(selected_index - 1, album_record.song_count == 0 ? -1 : albumID - 1);
+
+        select_page(m_page - 1);
+        return;
+    }
+
+    const uint32_t pageSize = 6;
+    const uint32_t rowStart = m_page * pageSize;
+
+    uint32_t remainingRows = (rowStart < album_record.song_count) ? (album_record.song_count - rowStart) : 0;
+    uint32_t rowsThisPage = (uint16_t)MIN(remainingRows, pageSize);
+
+    // UI stuff
+    if (e.code == BUTTON_SELECT) {
+        FRESULT fr = playbackMenu->init(rowStart + selected_index, album_record.song_list_off == 0 ? -1 : albumID - 1);
         if (fr != FR_OK) {
             errorMenu->set_fallback(this);
             errorMenu->set_message_utf8("Could not read this song");
@@ -235,17 +322,16 @@ void SongMenu::button_input(InputEvent &e) {
 
     // UI stuff
     if (e.code == BUTTON_DOWN) selected_index += 1;
-    if (e.code == BUTTON_UP) selected_index -=1;
+    if (e.code == BUTTON_UP)  selected_index -= 1;
     selected_index = selected_index < 0 ? 0 : selected_index;   //Clamp to 0
-    if (album_record.song_count == 0) selected_index = selected_index >= fm->read_song_count() ? fm->read_song_count()-1 : selected_index;
-    else selected_index = selected_index >= album_record.song_count ? album_record.song_count - 1 : selected_index;
+    selected_index = selected_index >= rowsThisPage ? rowsThisPage : selected_index;
 
     if (cached_canvas == nullptr) return;
     canvas_clear_partial(cached_canvas, 0, 0, 16, 127, CANVAS_COLOR_BW_WHITE);
-    canvas_draw_rect(cached_canvas, 8, 4 + (selected_index * 16), 12, 20 + (selected_index * 16), CANVAS_COLOR_BW_BLACK, DOT_SIZE_1X1, DRAW_FILL_FULL);
+    canvas_draw_rect(cached_canvas, 8, 20 + (selected_index * 16), 12, 36 + (selected_index * 16), CANVAS_COLOR_BW_BLACK, DOT_SIZE_1X1, DRAW_FILL_FULL);
 
     if (updates >= 8) {
-        draw_menu(cached_canvas);
+        parentManager->redraw();
     } else {
         canvas_refresh_screen_fast(cached_canvas);
         updates++;
@@ -262,23 +348,31 @@ void SongMenu::draw_menu(canvas_config_t *canvas) {
     uint32_t xCoord = 16;
     uint32_t yCoord = 4;
 
-    uint16_t allArr[6] = { '<', ' ', 'B', 'a', 'c', 'k' };
-    canvas_draw_text(canvas, allArr, 6, xCoord, yCoord, CANVAS_COLOR_BW_BLACK, 2, 0);
+    //Draw Page-Info
+    uint16_t buf[16];
+    size_t len = page_counter_to_u16(m_page, m_pages, buf, 16);
+    canvas_draw_text(canvas, buf, len, 296-(8 * (len + 1)), 0, CANVAS_COLOR_BW_BLACK, 2, 0);
+
+    size_t title_len = cp_len_0term(album_record.name, 22);
+    uint32_t title_len_px = canvas_draw_text(canvas, album_record.name, title_len, xCoord, yCoord, CANVAS_COLOR_BW_BLACK, 2, 0);
+    canvas_draw_line(canvas, xCoord, yCoord + 16, xCoord + title_len_px, yCoord + 16, CANVAS_COLOR_BW_BLACK, DOT_SIZE_1X1, LINE_STYLE_DOTTED);
     yCoord += 16;
 
-    uint32_t songCount = 0;
-    if (album_record.song_count == 0) songCount = fm->read_song_count();
-    else songCount = album_record.song_count;
-    songCount = MIN(songCount, 6);
+    const uint32_t pageSize = 6;
+    const uint32_t rowStart = m_page * pageSize;
 
-    for (uint i = 0; i < songCount; i++) {
+    uint32_t remainingRows = (rowStart < album_record.song_count) ? (album_record.song_count - rowStart) : 0;
+    uint32_t rowsThisPage = (uint16_t)MIN(remainingRows, pageSize);
+
+    for (uint i = 0; i < rowsThisPage; ++i) {
+        const uint32_t rowIndex = rowStart + i;
+
         song_record_t song_record;
         FRESULT fr;
-        if (album_record.song_count != 0) fr = fm->read_song_album_index(i, &album_record, &song_record);
-        else fr = fm->read_song_index(i, &song_record);
+        if (album_record.song_list_off != 0) fr = fm->read_song_album_index(rowIndex, &album_record, &song_record);
+        else fr = fm->read_song_index(rowIndex, &song_record);
 
         size_t name_len = cp_len_0term(song_record.name, SONG_NAME_CODEPOINTS);
-        //print_utf16le(song_record.name, name_len);
         canvas_draw_text(canvas, song_record.name, name_len, xCoord, yCoord, CANVAS_COLOR_BW_BLACK, 2, 0);
         yCoord += 16;
     }
@@ -286,9 +380,16 @@ void SongMenu::draw_menu(canvas_config_t *canvas) {
     canvas_refresh_screen(canvas);
 
     //Make sure no ghosting is left here
-    canvas_draw_rect(canvas, 8, 4 + (selected_index * 16), 12, 20 + (selected_index * 16), CANVAS_COLOR_BW_BLACK, DOT_SIZE_1X1, DRAW_FILL_FULL);
+    canvas_draw_rect(canvas, 8, 20 + (selected_index * 16), 12, 36 + ( selected_index * 16), CANVAS_COLOR_BW_BLACK, DOT_SIZE_1X1, DRAW_FILL_FULL);
     canvas_refresh_screen_fast(canvas);
     updates = 0;
+}
+
+void SongMenu::select_page(uint32_t page) {
+    if (page < 0 || page >= m_pages) return;
+    m_page = page;
+    selected_index = 0;
+    parentManager->redraw();
 }
 
 void SongMenu::init(uint16_t new_albumID) {
@@ -296,12 +397,18 @@ void SongMenu::init(uint16_t new_albumID) {
     this->albumID = new_albumID;
     if (new_albumID == 0) {
         // All songs - virtual album
-        album_record.song_count = 0;
+        utf8_to_16arr("All Songs", album_record.name, 22);
+        album_record.song_list_off = 0;
+        album_record.song_count = fm->read_song_count();
+        album_record.image_id = 0;
     }
     else {
         // Actual stored album
         fm->read_album_index(new_albumID - 1, &this->album_record);
     }
+
+    m_page = 0;
+    m_pages = (album_record.song_count + 5) / 6;
 }
 
 void SongMenu::close_menu(){}
@@ -344,6 +451,7 @@ void PlaybackMenu::draw_menu(canvas_config_t *canvas) {
 }
 
 FRESULT PlaybackMenu::init(uint32_t song_idx, uint32_t album_idx) {
+    ac->mute(true);
     if (song_idx < 0) song_idx = 0; // Do not wrap backwards just forwards (may change this later but not for now)
     this->songID = song_idx;
     this->albumID = album_idx;
@@ -418,6 +526,7 @@ void PlaybackMenu::button_input(InputEvent &e) {
             break;
             case BUTTON_PLAY:
                 ac->stop();
+                ac->mute(true);
                 parentManager->switch_menu(sm);
             break;
             default: break;

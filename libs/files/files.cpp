@@ -146,6 +146,9 @@ FRESULT FileManager::init() {
         printf("Failed to open artists.db: %d\n", fr);
         return fr;
     }
+    //Caclulate Artist-Count
+    fileSize = f_size(&artistDB);
+    artist_count = (uint32_t)(fileSize / ARTIST_RECORD_SIZE);
 
     fr = f_open(&albumDB, "albums.db", FA_READ);
     if (fr != FR_OK) {
@@ -229,6 +232,10 @@ uint32_t FileManager::read_song_count() {
 
 uint32_t FileManager::read_album_count() {
     return album_count;
+}
+
+uint32_t FileManager::read_artist_count() {
+    return artist_count;
 }
 
 FRESULT FileManager::read_artist_index(uint32_t index, artist_record_t* out) {

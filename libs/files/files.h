@@ -50,6 +50,7 @@ class FileManager {
 
         uint32_t read_song_count();
         uint32_t read_album_count();
+        uint32_t read_artist_count();
 
         FRESULT open_song_file(uint32_t index);
         void close_song_file();
@@ -63,6 +64,7 @@ class FileManager {
         FIL imageDB;
         uint32_t song_count;
         uint32_t album_count;
+        uint32_t artist_count;
 };
 
 //DR_WAV specific implementations

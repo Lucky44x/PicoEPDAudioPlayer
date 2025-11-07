@@ -90,7 +90,7 @@ void canvas_draw_line(canvas_config_t *cfg, uint16_t xStart, uint16_t yStart, ui
 void canvas_draw_rect(canvas_config_t *cfg, uint16_t xStart, uint16_t yStart, uint16_t xEnd, uint16_t yEnd, uint8_t color, CANVAS_DOT_SIZE lineWidth, CANVAS_DRAW_FILL fillStyle);
 void canvas_draw_circle(canvas_config_t *cfg, uint16_t xCenter, uint16_t yCenter, uint16_t radius, uint8_t color, CANVAS_DOT_SIZE lineWidth, CANVAS_DRAW_FILL fillStyle);
 uint8_t canvas_draw_char(canvas_config_t *cfg, uint16_t character, uint16_t xPoint, uint16_t yPoint, uint8_t color);
-void canvas_draw_text(canvas_config_t *cfg, const uint16_t *text, size_t len, uint16_t xPoint, uint16_t yPoint, uint8_t color, uint8_t spacing, uint16_t maxTextArea);
+uint32_t canvas_draw_text(canvas_config_t *cfg, const uint16_t *text, size_t len, uint16_t xPoint, uint16_t yPoint, uint8_t color, uint8_t spacing, uint16_t maxTextArea);
 uint8_t canvas_get_char_width(uint16_t character);
 void canvas_draw_bitmap(canvas_config_t *cfg, const uint8_t *imageBuffer, uint16_t xPoint, uint16_t yPoint, uint16_t width, uint16_t height, uint8_t bpp, bool invert);
 

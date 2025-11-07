@@ -56,6 +56,12 @@ void core1_entry() {
     while(true) { sleep_ms(100); }
 }
 
+void error_loop() {
+    while (true) {
+        uiManager.update();
+    }
+}
+
 int main()
 {
     stdio_init_all();
@@ -65,8 +71,6 @@ int main()
     //Launch EPD
     printf("Launching EPD-Driver\n");
     uiManager.init();
-    mainMenuUI.setup(&songMenuUI);
-    playbackMenu.setup(&songMenuUI);
     sleep_ms(100);
 
     printf("Launching Input-Manager\n");
@@ -84,7 +88,8 @@ int main()
         printf("Failed to initialize Input-Manager\n");
         errorMenu.set_message_utf8("Input init failed");
         uiManager.switch_menu(&errorMenu);
-        return 1;
+        error_loop();
+        // Blocks forever
     }
 
     printf("Launching File-System..\n");
@@ -94,8 +99,13 @@ int main()
         printf("Failed to initialize File-Manager %u", fileManager_ok);
         errorMenu.set_message_utf8("No SD-Card found");
         uiManager.switch_menu(&errorMenu);
-        return 1;
+        error_loop();
+        // Blocks forever
     }
+
+    // Setup main menu etc only AFTER file system has set-up
+    mainMenuUI.setup(&songMenuUI);
+    playbackMenu.setup(&songMenuUI);
 
     // Launch DAC-Thread
     printf("Launching Audio on Core-1\n");
@@ -106,7 +116,8 @@ int main()
         printf("Core1 init failed\n");
         errorMenu.set_message_utf8("Core-1 failed...");
         uiManager.switch_menu(&errorMenu);
-        return 1;
+        error_loop();
+        // Blocks forever
     }
     printf("Core1 ready... Launching Audio-Core\n");
 
@@ -114,7 +125,8 @@ int main()
         printf("Audio core could not start\n");
         errorMenu.set_message_utf8("Audio failed...");
         uiManager.switch_menu(&errorMenu);
-        return 1;
+        error_loop();
+        // Blocks forever
     }
     g_core.mute(true);
 

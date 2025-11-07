@@ -369,7 +369,7 @@ uint8_t canvas_draw_char(canvas_config_t *cfg, uint16_t character, uint16_t xPoi
 function :  Draws the given text on the canvas
 parameter:  cfg, text-ptr, text-length, xPoint, yPoint, color, spacing, maxTextArea
 ******************************************************************************/
-void canvas_draw_text(canvas_config_t *cfg, const uint16_t *text, size_t len, uint16_t xPoint, uint16_t yPoint, uint8_t color, uint8_t spacing, uint16_t maxTextArea) {
+uint32_t canvas_draw_text(canvas_config_t *cfg, const uint16_t *text, size_t len, uint16_t xPoint, uint16_t yPoint, uint8_t color, uint8_t spacing, uint16_t maxTextArea) {
     uint16_t x = xPoint;
     uint16_t used_width = 0;
 
@@ -388,7 +388,7 @@ void canvas_draw_text(canvas_config_t *cfg, const uint16_t *text, size_t len, ui
             for(int j = 0; j < 3; j ++) {
                 x += canvas_draw_char(cfg, dot, x, yPoint, color) + spacing; //No NULL check needed, dots are always defined... otherwise its a shit font
             }
-            return;
+            return used_width;
         }
 
         //Redundency but what the hell, why not
@@ -400,6 +400,7 @@ void canvas_draw_text(canvas_config_t *cfg, const uint16_t *text, size_t len, ui
             if (char_width > 0) { x += spacing; used_width += spacing; }
         }
     }
+    return used_width;
 }
 
 /******************************************************************************
